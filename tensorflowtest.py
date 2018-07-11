@@ -4,6 +4,12 @@ import tkinter as tk
 import matplotlib.pyplot as plt
 import numpy as np
 
+class Figure(object):
+    @staticmethod
+    def saveFigure(fig,w_inches, h_inches, location):
+        fig.set_size_inches(w_inches, h_inches)
+        plt.savefig("location", dpi=100)
+
 class DataVisualisation(object):
     fileName    = ""
     sheet       = ""
@@ -20,6 +26,7 @@ class DataVisualisation(object):
     #Example BoxPlot
     def boxPlot(self):
         groupedRow = self.dataFrame.groupby(self.dataFrame[self.dataFrame.columns[0]].dt.weekday_name)
+        print (groupedRow.get_group('Monday'))
         print("Plotting")
         for index,column in enumerate(self.dataFrame):
             if(index >= 2):
@@ -28,7 +35,6 @@ class DataVisualisation(object):
                 newdataFrame = pd.DataFrame()
                 for name, group in groupedRow:
                     newdataFrame[name] = group[column].reset_index(drop=True)
-
                 newdataFrame.boxplot()
                 plt.savefig("BoxPlots/" + column)
 
@@ -61,10 +67,12 @@ class DataVisualisation(object):
         plt.savefig("Correlation/KPIS")
 
     def correlation(self):
-        groupedRow = self.dataFrame.groupby(self.dataFrame[self.dataFrame.columns[0]].dt.weekday_name)
+        groupedRow = self.dataFrame.groupby(self.dataFrame[self.dataFrame.columns[0]].dt.weekday_name, sort=False)
         dayCorrelation = np.zeros((7,7))
+        daysGroup1 = []
         group1c = 0
         for name1, group1 in groupedRow:
+            daysGroup1.append(name1)
             group1 = group1.drop("Period start time", axis=1)
             group1 = group1.drop("PLMN Name", axis=1)
             newdataFrame1 = pd.DataFrame()
@@ -75,8 +83,8 @@ class DataVisualisation(object):
                 group2 = group2.drop("PLMN Name", axis=1)
                 newdataFrame2 = pd.DataFrame()
                 newdataFrame2 = group2.reset_index(drop=True)
-                print (newdataFrame1)
-                print (newdataFrame2)
+                #print (newdataFrame1)
+                #print (newdataFrame2)
                 colCorrelation = newdataFrame1.corrwith(newdataFrame2)
                 averageBetweenTwoDays = colCorrelation.mean()
                 dayCorrelation[group1c][group2c] =  averageBetweenTwoDays
@@ -87,10 +95,9 @@ class DataVisualisation(object):
         ax = fig.add_subplot(111)
         cax = ax.matshow(correlationFrame, vmin=-1, vmax=1)
         fig.colorbar(cax)
-        plt.savefig("Correlation/Days")
-
-
-
+        ax.set_xticklabels(['']+daysGroup1)
+        ax.set_yticklabels(['']+daysGroup1)
+        Figure.saveFigure(fig,18,10,"Correlation/Days")
 
 
 def main():

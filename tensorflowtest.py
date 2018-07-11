@@ -3,42 +3,40 @@ import pandas as pd
 import tkinter as tk
 import matplotlib.pyplot as plt
 
+class DataVisualisation(object):
+    fileName    = ""
+    sheet       = ""
+    dataFrame   = pd.DataFrame()
 
+    def __init__(self,fileName,sheet):
+        self.fileName = fileName
+        self.sheet    = sheet
 
+    def readDataSheet(self):
+        self.dataFrame = pd.read_excel(self.fileName, self.sheet)
+        return self.dataFrame
 
-def readFile():
-    fileName = "ExampleDailycharts.xlsx"
-    dataFrame= pd.read_excel(fileName, "Data")
-    groupedRow = dataFrame.groupby(dataFrame[dataFrame.columns[0]].dt.weekday_name)
-    #ayseries= dataFrame[dataFrame.columns[0]].dt.weekday_name
-    #print (dayseries.groupby(lambda x: x))
+    #Example BoxPlot
+    def boxPlot(self):
+        groupedRow = self.dataFrame.groupby(self.dataFrame[self.dataFrame.columns[0]].dt.weekday_name)
+        print("Plotting")
+        for index,column in enumerate(self.dataFrame):
+            if(index >= 2):
+                plt.figure()
+                plt.title(column)
+                newdataFrame = pd.DataFrame()
+                for name, group in groupedRow:
+                    newdataFrame[name] = group[column].reset_index(drop=True)
 
-    #for key, item in groupedRow:
-    #    print (groupedRow.get_group(key))
-    #groupedRow.plot("Monday","E-UTRAN Init E-RAB acc (LTE_5060I)")
-    #plt.show()
-
-    for index,column in enumerate(dataFrame):
-        if(index >= 2):
-            plt.figure()
-            plt.title(column)
-            for name, group in groupedRow:
-                group[column].plot()
-                #subdataFrame = pd.concat([group['Period start time'],group[column]],axis=1)
-                #print (subdataFrame)
-                #subdataFrame.plot()
-                #plt.xaxis.set_major_formatter(plt.dates.DateFormatter('%Y-%m-%d'))
-
-            plt.savefig("BaselineGraph/" + column)
-
+                newdataFrame.boxplot()
+                plt.savefig("BaselineGraph/" + column)
 
 def main():
-  print("Hello World!")
-  hello = tf.constant('Hello')
-  sess = tf.Session()
-  print(sess.run(hello))
+    dV1 = DataVisualisation("ExampleDailycharts.xlsx", "Data")
+    dV1.readDataSheet()
+    dV1.boxPlot()
+
 
 
 if __name__== "__main__":
   main()
-  readFile()

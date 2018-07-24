@@ -86,7 +86,7 @@ class DataVisualisation(object):
         self.dataFrame = self.dataFrame.drop("PLMN Name", axis=1)
 
         correlations = self.dataFrame.corr()
-        correlations = correlations.applymap(lambda x: x if abs(x) > 0.95 else 0)
+        correlations = correlations.applymap(lambda x: x if abs(x) > 0.90 else 0)
         #print (correlations)
         newdataFrame = pd.DataFrame()
 

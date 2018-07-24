@@ -118,9 +118,6 @@ class DataVisualisation(object):
         print(test.kneighbors())
 
 
-    def checkTrafficKPI(self, daily_grouped_dataFrame):
-        #for (_, day_readings) in daily_grouped_dataFrame:
-        print (1)
 
 
 

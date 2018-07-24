@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import time
+import config as cfg
 
 class ExportData(object):
     fileName = ""
@@ -44,62 +44,57 @@ class ImportData(object):
             return self.dataFrame.groupby(self.dataFrame.index.dayofyear, sort=False)
 
 
+class GraphData(object):
+        @staticmethod
+        def saveFigure(fig,w_inches, h_inches, location):
+            fig.set_size_inches(w_inches, h_inches)
+            plt.savefig(location, dpi=100, format='png')
 
-def calculateMeanAverage(windowData, windowSize, newData):
+        @staticmethod
+        def createFigure(title):
+            fig = plt.figure()
+            plt.title(title)
+            return fig
+
+        @staticmethod
+        def comparisonPlot(dataList, storeLocation):
+            for columnLabel, _ in dataList[0].iteritems():
+                fig = GraphData.createFigure(columnLabel)
+                for data in dataList:
+                    plt.plot(data[columnLabel])
+                GraphData.saveFigure(fig,10,6, storeLocation + columnLabel)
+
+
+def calculateMeanAverage(windowData,windowSize, newData):
     windowData = windowData.append(newData)
-
     if (len(windowData.index) > windowSize):
         windowData = windowData.iloc[1:]
         return windowData, windowData.mean()
     return windowData, pd.Series()
 
-
 def referenceAlgorithm(spreadSheet1In):
-    windowData       = pd.DataFrame()
-    forcastData      = pd.Series()
-    maeData          = pd.Series()
-    nData            = 0
+    predictionData = pd.DataFrame()
+    windowData     = pd.DataFrame()
+    forcastSeries  = pd.Series()
+
     for index, hourReading in spreadSheet1In.dataFrame.iterrows():
-        #forcastData is the prediction for this hourReading
-        if not (forcastData.empty):
-            if(maeData.empty):
-                maeData = forcastData.subtract(hourReading).abs()
-            else:
-                maeData = maeData.add(forcastData.subtract(hourReading).abs())
-            nData += 1
-        windowData, forcastData = calculateMeanAverage(windowData, 4, hourReading)
-    maeData = maeData.divide(nData)
-    return maeData
+        forcastSeries.name = index
+        predictionData = predictionData.append(forcastSeries)
+        windowData, forcastSeries = calculateMeanAverage(windowData, 4, hourReading)
+    return predictionData
 
 
-
-def setDataUp(spreadSheet1In):
-    spreadSheet1In.dataFrame.set_index('Period start time', inplace=True)
-    spreadSheet1In.dataFrame.drop('PLMN Name', axis=1, inplace=True)
-    spreadSheet1In.dataFrame.dropna(axis=0, how='all', inplace=True)
-
+def setDataUp(spreadSheetIn):
+    #Set datetime to be index
+    spreadSheetIn.dataFrame.set_index('Period start time', inplace=True)
+    #Drop PLMN tag
+    spreadSheetIn.dataFrame.drop('PLMN Name', axis=1, inplace=True)
+    #Drop all columns more than 90% empty
+    spreadSheetIn.dataFrame=spreadSheetIn.dataFrame.replace({'':np.nan})
+    spreadSheetIn.dataFrame.dropna(axis=1, thresh=0.9*len(spreadSheetIn.dataFrame), inplace=True)
     #Drop rows with index NaT
-    spreadSheet1In.dataFrame = spreadSheet1In.dataFrame.loc[pd.notnull(spreadSheet1In.dataFrame.index)]
+    spreadSheetIn.dataFrame = spreadSheetIn.dataFrame.loc[pd.notnull(spreadSheetIn.dataFrame.index)]
 
-
-    '''
-    dailyGroupedData = spreadSheet1In.groupDataByDay()
-    firstDay = next(iter(dailyGroupedData.groups))
-
-    trainingData = pd.DataFrame()
-    forcastData = pd.DspreadSheet1OutataFrame()
-
-    for day, dayReadings in dailyGroupedData:
-        if day <= firstDay + trainingDays:
-            trainingData = trainingData.append(dayReadings)
-        else:
-            forcastData = forcastData.append(dayReadings)
-
-    forcastData.dropna(axis=0, how='all', inplace=True)
-    trainingData.dropna(axis=0, how='all', inplace=True)
-
-    return (trainingData, forcastData)
-    '''
 
 
 def ImportDataFromExcel():
@@ -112,12 +107,12 @@ def ExportDataToExcel():
 def main():
     spreadSheet1In  = ImportDataFromExcel()
     spreadSheet1Out = ExportDataToExcel()
+
     setDataUp(spreadSheet1In)
-    maeDataRA = referenceAlgorithm(spreadSheet1In)
-    spreadSheet1Out.writeExcelData(maeDataRA)
 
-
-
+    predictionData = referenceAlgorithm(spreadSheet1In)
+    GraphData.comparisonPlot([spreadSheet1In.dataFrame, predictionData], cfg.referenceGraphLocation)
+    #spreadSheet1Out.writeExcelData(predictionData)
 
 if __name__== "__main__":
   main()

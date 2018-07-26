@@ -11,8 +11,11 @@ writeNewDataLocation     = "../Data/NewData.xlsx"
 writeNewDataSheetName    = "Sheet1"
 
 #Write Correlation Data
-writeCorrelationLocation  = "../Data/Correlation.xlsx"
-writeCorrelationSheetName = "Sheet1"
+writeCorrelationDailyLocation  = "../Data/CorrelationDaily.xlsx"
+writeCorrelationSDailySheetName = "Sheet1"
+
+writeCorrelationHourlyLocation = "../Data/CorrelationHourly.xlsx"
+writeCorrelationHourlySheetName = "Sheet1"
 
 
 #Reference
@@ -20,5 +23,11 @@ referenceWindowSize = 4
 referenceGraphLocation = "../Plot/Reference/"
 
 
+#Training/Future Data Separation
+trainingDays = 14
+
+
+
 #Correlation Threshold
-upperThreshold = 0.9
+dailyThreshold  = 0.9
+hourlyThreshold = 0.96

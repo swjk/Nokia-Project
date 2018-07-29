@@ -26,7 +26,8 @@ referenceGraphLocation = "../Plot/Reference/"
 #Training/Future Data Separation
 trainingDays = 14
 
-
+#Arima Forcast Hours
+predictionHours = 24
 
 #Correlation Threshold
 dailyThreshold  = 0.9

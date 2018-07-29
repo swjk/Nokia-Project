@@ -184,22 +184,46 @@ def correlation(spreadSheetIn, spreadSheetOut, upperThreshold):
 Regression Algorithm
 """
 
-def linearRegressionAlgorithm(trainingData, correlationHourlyData):
+def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData):
     #E.g. Avg act UEs DL
     correlationSeries = correlationHourlyData['Avg act UEs DL']
-    topCorrelation = correlationSeries.sort_values(ascending=False)
-    topCorrelation.dropna(inplace=True)
-    subset = trainingData[topCorrelation.index.values].values
+    topCorrelationKPIs = correlationSeries.sort_values(ascending=False)
+    topCorrelationKPIs.dropna(inplace=True)
+    topCorrelationKPIs = topCorrelationKPIs.head(5)
 
-    targetColumn = trainingData['Avg act UEs DL']
-    targetColumn = targetColumn.values
+    topCorrelationKPIsNames  = topCorrelationKPIs.index.values
+    topCorrelationKPIsValues = trainingData[topCorrelationKPIs.index.values].values
+
+    targetKPI = trainingData['Avg act UEs DL']
+    targetKPI = targetKPI.values
 
     regr = linear_model.LinearRegression()
-    regr.fit(subset, targetColumn)
+    regr.fit(topCorrelationKPIsValues, targetKPI)
+
+    forcastTopCorrelationKPIsValues = analyseARIMA2(trainingData[topCorrelationKPIsNames],
+                                                    futureData[topCorrelationKPIsNames],
+                                                    cfg.predictionHours)
+    print( topCorrelationKPIsNames)
+    print (forcastTopCorrelationKPIsValues.columns)
+
+    forcastTargetKPIValues = regr.predict(forcastTopCorrelationKPIsValues.values)
+    predictionResult = pd.DataFrame()
+    predictionResult['Avg act UEs DL'] = forcastTargetKPIValues
+    predictionResult.set_index(forcastTopCorrelationKPIsValues.index, inplace=True)
+    print (predictionResult)
+
+    GraphData.comparisonPlot([{'data': predictionResult, 'name': 'prediction'},
+                             {'data':futureData, 'name': 'actual'}], '../LinearRegression/')
+    return predictionResult
+
+    
 
 
-    print (subset)
-    print (topCorrelation)
+    #print (forcastTopCorrelationKPIsValues)
+    #print( topCorrelationKPIsValues)
+
+    #regr.predict(X)
+
 
 """
 -------------------------------------------------------------------------------
@@ -271,6 +295,7 @@ def analyseARIMA2(trainingData, futureData, predictionHours):
     day1Data = groupedByDayName.get_group(day1Name)
     day2Data = groupedByDayName.get_group(day2Name)
 
+    predictionResult = pd.DataFrame()
     for kpi in day1Data:
         day1KPIData = day1Data[kpi]
         day1KPIDataReset = day1KPIData.reset_index(drop=True)
@@ -302,28 +327,17 @@ def analyseARIMA2(trainingData, futureData, predictionHours):
 
             predictionDataDay2 = model2.forecast(forcastLengthDay2)
 
-        predictionDataFrame = pd.DataFrame()
         if predictionDataDay2 == None:
             forcastData = predictionDataDay1[0]
-            predictionDataFrame[kpi] = forcastData
-            predictionDataFrame.set_index(timeRangeDay1, inplace=True)
+            predictionResult[kpi] = forcastData
+            predictionResult.set_index(timeRangeDay1, inplace=True)
         else:
             forcastData = predictionDataDay1[0] + predictionDataDay2[0]
-            predictionDataFrame[kpi] = forcastData
-            predictionDataFrame.set_index(timeRangeDay1.append(timeRangeDay2), inplace =True)
-        GraphData.comparisonPlot([{'data': predictionDataFrame, 'name': 'prediction'},
-                                  {'data':futureData, 'name': 'actual'}], '../New/')
-
-
-
-def test(trainingData):
-    targetColumn = trainingData['Avg act UEs DL']
-    targetData = pd.concat([targetColumn, targetColumn],ignore_index=True)
-    #model = ARIMA(targetColumn, order=(1,0,1))
-    #results_ARIMA = model.fit()
-    #print(results_ARIMA.aic)
-
-
+            predictionResult[kpi] = forcastData
+            predictionResult.set_index(timeRangeDay1.append(timeRangeDay2), inplace =True)
+    GraphData.comparisonPlot([{'data': predictionResult, 'name': 'prediction'},
+                             {'data':futureData, 'name': 'actual'}], '../LinearRegression/')
+    return predictionResult
 
 """
 def seasonalARIMA(trainingData, futureData):
@@ -392,13 +406,12 @@ def main():
     #forcastReference(trainingData, futureData)
 
     #correlationDailyData  = correlation(spreadSheet2In, spreadSheet2Out, cfg.dailyThreshold)
-    #correlationHourlyData = correlation(spreadSheet1In, spreadSheet3Out, cfg.hourlyThreshold)
-
-    #linearRegressionAlgorithm(trainingData, correlationHourlyData)
+    correlationHourlyData = correlation(spreadSheet1In, spreadSheet3Out, cfg.hourlyThreshold)
+    linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData)
     #analyseARIMA(trainingData)
     #test(trainingData)
     #seasonalARIMA(trainingData,futureData)
-    analyseARIMA2(trainingData,futureData, 24)
+    #analyseARIMA2(trainingData,futureData, cfg.predictionHours)
 
 
     #predictionData = referenceAlgorithm(spreadSheet1In, cfg.referenceWindowSize)

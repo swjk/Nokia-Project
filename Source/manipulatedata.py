@@ -13,3 +13,6 @@ class DataManipulation(object):
     @staticmethod
     def groupDataByTime(data):
         return data.groupby(data.index.time, sort=False)
+    @staticmethod
+    def groupDataByDate(data):
+        return data.groupby(data.index.date, sort=False)

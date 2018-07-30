@@ -283,10 +283,18 @@ def seasonalARIMA(trainingData, futureData):
 LSTM Neural Network
 """
 # convert time series into supervised learning problem
-def toSupervisedStructure(trainingData, n_in=1, n_out=1, dropnan=True):
-    data = trainingData
-    n_vars = 1
-    df = pd.DataFrame(data)
+def toSupervisedStructure(trainingData):
+    print ("test")
+
+
+
+
+
+
+
+
+
+"""
     cols, names = list(), list()
 	# input sequence (t-n, ... t-1)
     for i in range(n_in, 0, -1):
@@ -306,7 +314,8 @@ def toSupervisedStructure(trainingData, n_in=1, n_out=1, dropnan=True):
     if dropnan:
         agg.dropna(inplace=True)
     return agg
-
+"""
+"""
 def fitLSTM(trainingData, nlag, nneurons, nbatch, nepoch):
     X,y = trainingData[:, 0:nlag] , trainingData[:, nlag:]
     X = X.reshape(X.shape[0],1,X.shape[1])
@@ -322,32 +331,61 @@ def fitLSTM(trainingData, nlag, nneurons, nbatch, nepoch):
 
     return model
 
+"""
+
+def fitLSTM(train, test, nneurons, nbatch, nepoch):
+    X = train.reshape(train.shape[0], 1, train.shape[1])
+
+    model = Sequential()
+    model.add(LSTM(nneurons, batch_input_shape=(nbatch, X.shape[1], X.shape[2])))
+    model.add(Dense(test.shape[1]))
+    model.compile(loss="mean_squared_error", optimizer='adam')
+
+    for i in range (nepoch):
+        model.fit(X,test,epochs=1, batch_size=nbatch, verbose=0, shuffle=False)
+        model.reset_states()
+    return model
+
+def LSTMPrediction(trainingData,futureData):
+    columnTarget  = trainingData['Avg IP thp DL QCI8']
+    firstDateTime = pd.to_datetime(trainingData.index.values[-1]) + pd.Timedelta(hours=1)
+    dateTimeRangeDay1 = pd.date_range(start=(firstDateTime), end = firstDateTime + pd.Timedelta(hours=23), freq='H')
+    # TODO: NEED TO ADD REST TO GET DATE TIME
 
 
-def LSTMPrediction(trainingData):
-    columnTarget = trainingData['Avg IP thp DL QCI8']
+    groupedByDate = DataManipulation.groupDataByDate(columnTarget)
+    dayNumber = []
+    dayList   = []
+    for group in groupedByDate:
+        dayNumber.append(group[0].weekday()/3 -1)
+        dayList.append(group[1].values)
+
     scaler = MinMaxScaler(feature_range=(-1,1))
-    scaledColumnTarget = scaler.fit_transform(columnTarget.values[1:].reshape(-1,1))
+    scaledColumnTarget = scaler.fit_transform(dayList)
+    dayNumber = np.array(dayNumber).reshape(-1,1)
+    result = np.concatenate((dayNumber, scaledColumnTarget),axis=1)
 
-    supervisedData = toSupervisedStructure(scaledColumnTarget, 3, 3)
+    train = np.delete(result,len(result)-1,0)
+    test  = np.delete(result,0,0)
+    last24 = result[-1]
 
-    print(supervisedData.values)
-    print(supervisedData.values[-1][3:])
-    test = supervisedData.values[-1][3:]
+    model = fitLSTM(train, test, 30, 1, 30)
+    forecast = model.predict(last24.reshape(1,1,len(last24)))
+    inv_scale = np.delete(forecast[0],0,0)
 
-    model = fitLSTM(supervisedData.values,3,50,1,100)
-
-    forecast = model.predict(test.reshape(1,1, len(test)))
-
-    inv_scale = scaler.inverse_transform(forecast[0].reshape(1,-1))
-    print (inv_scale)
+    inv_scale = scaler.inverse_transform(inv_scale.reshape(1,-1))
     inv_scale = inv_scale[0,:]
-    print (inv_scale)
+    print( inv_scale)
+
+    predictionDataFrame = pd.DataFrame()
+    predictionDataFrame['Avg IP thp DL QCI8'] = pd.Series(inv_scale)
+    predictionDataFrame.set_index(dateTimeRangeDay1, inplace=True)
+    GraphData.comparisonPlot([{'data': predictionDataFrame,  'name': 'prediction'},
+
+                          {'data':futureData, 'name': 'actual'}], "../")
 
 
-
-
-
+    print(predictionDataFrame)
 
 
 def calculateMAE(originalData, predictionData):
@@ -386,7 +424,7 @@ def main():
     #forcastReference(trainingData, futureData)
     #correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
     #linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData)
-    LSTMPrediction(trainingData)
+    LSTMPrediction(trainingData,futureData)
 
 
 if __name__== "__main__":

@@ -53,6 +53,29 @@ def forcastReference(trainingData, futureData):
 Regression Algorithm
 """
 def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, predictionType):
+    """
+    Algorithm used to create forcast for one or more KPIs in training data.
+    For each KPI, will first find dependent KPIs and model these using predictionType.
+    Will then use linear regression to combine these to predict future for this KPI
+
+    Will ignore KPI will no dependencies
+
+    Parameters
+    ----------
+    trainingData : pandas dataframe
+        training data containing one or more KPIs
+    futureData: pandas dataframe
+        data containing one or more KPIs to be predicted
+    correlationHourlyData: pandas dataframe
+        correlation information for all KPIs above defined threshold
+    predictionType: string
+        "ARIMA" or "LSTM" - used to model dependencies
+
+    Returns
+    -------
+
+    """
+
     for kpi in trainingData:
         print (kpi)
         if kpi not in correlationHourlyData.columns:
@@ -103,6 +126,23 @@ def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, p
 
 #------Forcast Limits--------------
 def forcastLimits(trainingData, predictionHours, kpi):
+    """
+    Calculate average standard deviation of weekly time points (e.g Mon 9am).
+
+    Parameters
+    ----------
+    trainingData : pandas dataframe
+        training data
+    predictionHours: int
+        number of hours predicted
+    kpi: string
+        kpi that calculation should be carried out on
+
+    Returns
+    -------
+    pandas series
+        series containing calculation for each time point
+    """
     groupedByDayName = DataManipulation.groupDataByDayName(trainingData)
     firstDateTime = pd.to_datetime(trainingData.index.values[-1]) + pd.Timedelta(hours=1)
     if (firstDateTime + pd.Timedelta(hours=predictionHours)).date() == firstDateTime.date():
@@ -151,7 +191,6 @@ def analyseARIMA(trainingData, kpi):
     """
     Analyse training Data to show autocorrelation and partial autocorrelation
     """
-
     targetColumn = trainingData[kpi]
     lag_acf  = acf(targetColumn,  nlags=170)
     lag_pacf = pacf(targetColumn, nlags=170, method='ols')

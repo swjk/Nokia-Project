@@ -52,7 +52,7 @@ def forcastReference(trainingData, futureData):
 -------------------------------------------------------------------------------
 Regression Algorithm
 """
-def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData):
+def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, predictionType):
     for kpi in trainingData:
         print (kpi)
         if kpi not in correlationHourlyData.columns:
@@ -72,11 +72,17 @@ def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData):
             regr = linear_model.LinearRegression()
             regr.fit(topCorrelationKPIsValues, targetKPI)
 
-            forcastTopCorrelationKPIsValues = predictionARIMA(trainingData[topCorrelationKPIsNames],
+
+            if predictionType == "ARIMA":
+                graphStoreLocation = cfg.lrARIMAGraphLocation
+                forcastTopCorrelationKPIsValues = predictionARIMA(trainingData[topCorrelationKPIsNames],
                                                     futureData[topCorrelationKPIsNames],
                                                     cfg.predictionHours)
-            print( topCorrelationKPIsNames)
-            print (forcastTopCorrelationKPIsValues.columns)
+            elif predictionType == "LSTM":
+                graphStoreLocation = cfg.lrLSTMGraphLocation
+                forcastTopCorrelationKPIsValues = predictionLSTM(trainingData[topCorrelationKPIsNames],
+                                                    futureData[topCorrelationKPIsNames],
+                                                    cfg.predictionHours)
 
             forcastTargetKPIValues = regr.predict(forcastTopCorrelationKPIsValues.values)
             predictionResult = pd.DataFrame()
@@ -93,7 +99,7 @@ def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData):
             GraphData.comparisonPlot([{'data': predictionResult, 'dependencies': topCorrelationKPIsNames, 'name': 'prediction'},
                               {'data': predictionStdUpperLimit, 'style': '--', 'name': "upperlimit"},
                               {'data': predictionStdLowerLimit, 'style': '--', 'name': "lowerlimit"},
-                              {'data':futureData, 'name': 'actual'}], cfg.lrGraphLocation)
+                              {'data':futureData, 'name': 'actual'}], graphStoreLocation)
 
 #------Forcast Limits--------------
 def forcastLimits(trainingData, predictionHours, kpi):
@@ -282,57 +288,6 @@ def seasonalARIMA(trainingData, futureData):
 -------------------------------------------------------------------------------
 LSTM Neural Network
 """
-# convert time series into supervised learning problem
-def toSupervisedStructure(trainingData):
-    print ("test")
-
-
-
-
-
-
-
-
-
-"""
-    cols, names = list(), list()
-	# input sequence (t-n, ... t-1)
-    for i in range(n_in, 0, -1):
-        cols.append(df.shift(i))
-        names += [('var%d(t-%d)' % (j+1, i)) for j in range(n_vars)]
-	# forecast sequence (t, t+1, ... t+n)
-    for i in range(0, n_out):
-        cols.append(df.shift(-i))
-        if i == 0:
-            names += [('var%d(t)' % (j+1)) for j in range(n_vars)]
-        else:
-            names += [('var%d(t+%d)' % (j+1, i)) for j in range(n_vars)]
-	# put it all together
-    agg = pd.concat(cols, axis=1)
-    agg.columns = names
-	# drop rows with NaN values
-    if dropnan:
-        agg.dropna(inplace=True)
-    return agg
-"""
-"""
-def fitLSTM(trainingData, nlag, nneurons, nbatch, nepoch):
-    X,y = trainingData[:, 0:nlag] , trainingData[:, nlag:]
-    X = X.reshape(X.shape[0],1,X.shape[1])
-
-    model = Sequential()
-    model.add(LSTM(nneurons, batch_input_shape=(nbatch,X.shape[1],X.shape[2])))
-    model.add(Dense(y.shape[1]))
-    model.compile(loss="mean_squared_error", optimizer='adam')
-
-    for i in range (nepoch):
-        model.fit(X,y,epochs=1, batch_size=nbatch, verbose=0, shuffle=False)
-        model.reset_states()
-
-    return model
-
-"""
-
 def fitLSTM(train, test, nneurons, nbatch, nepoch):
     X = train.reshape(train.shape[0], 1, train.shape[1])
 
@@ -346,46 +301,56 @@ def fitLSTM(train, test, nneurons, nbatch, nepoch):
         model.reset_states()
     return model
 
-def LSTMPrediction(trainingData,futureData):
-    columnTarget  = trainingData['Avg IP thp DL QCI8']
+def predictionLSTM(trainingData,futureData, predictionHours):
+    # TODO: MAY NEED TO CHECK IF STATIONARY AND THEN INVERT AT END
+
+    removeFirstNRows = len(trainingData) % predictionHours
+    trainingData     = trainingData.iloc[removeFirstNRows:]
+
     firstDateTime = pd.to_datetime(trainingData.index.values[-1]) + pd.Timedelta(hours=1)
-    dateTimeRangeDay1 = pd.date_range(start=(firstDateTime), end = firstDateTime + pd.Timedelta(hours=23), freq='H')
-    # TODO: NEED TO ADD REST TO GET DATE TIME
+    dateTimeRange = pd.date_range(start=(firstDateTime), end = firstDateTime + pd.Timedelta(hours=predictionHours-1), freq='H')
 
+    predictionResult = pd.DataFrame()
+    for kpi in trainingData:
+        print(kpi)
+        kpiSeries = trainingData[kpi]
+        # index, datetime, value
+        kpiFrame  = kpiSeries.reset_index()
+        groupedByPredHourMultiple  = DataManipulation.groupDataByPredictHourMultiple(kpiFrame)
 
-    groupedByDate = DataManipulation.groupDataByDate(columnTarget)
-    dayNumber = []
-    dayList   = []
-    for group in groupedByDate:
-        dayNumber.append(group[0].weekday()/3 -1)
-        dayList.append(group[1].values)
+        #groupLabels days(Mon,Tue..) only if each group 0:00 - 23:00
+        groupLabels = []
+        groupValues = []
 
-    scaler = MinMaxScaler(feature_range=(-1,1))
-    scaledColumnTarget = scaler.fit_transform(dayList)
-    dayNumber = np.array(dayNumber).reshape(-1,1)
-    result = np.concatenate((dayNumber, scaledColumnTarget),axis=1)
+        for group in groupedByPredHourMultiple:
+            groupLabel = group[1].iloc[0,0].weekday() / 3 - 1
+            groupLabels.append(groupLabel)
+            groupValue = group[1].iloc[:,1].values
+            groupValues.append(groupValue)
 
-    train = np.delete(result,len(result)-1,0)
-    test  = np.delete(result,0,0)
-    last24 = result[-1]
+        scaler = MinMaxScaler(feature_range=(-1,1))
+        scaledGroupValues = scaler.fit_transform(groupValues)
 
-    model = fitLSTM(train, test, 30, 1, 30)
-    forecast = model.predict(last24.reshape(1,1,len(last24)))
-    inv_scale = np.delete(forecast[0],0,0)
+        groupLabels = np.array(groupLabels).reshape(-1,1)
 
-    inv_scale = scaler.inverse_transform(inv_scale.reshape(1,-1))
-    inv_scale = inv_scale[0,:]
-    print( inv_scale)
+        train       = np.concatenate((groupLabels, scaledGroupValues), axis=1)
+        trainInput  = np.delete(train, len(train)-1, 0)
+        trainOuput  = np.delete(train, 0, 0)
+        trainForcastInput = train[-1]
 
-    predictionDataFrame = pd.DataFrame()
-    predictionDataFrame['Avg IP thp DL QCI8'] = pd.Series(inv_scale)
-    predictionDataFrame.set_index(dateTimeRangeDay1, inplace=True)
-    GraphData.comparisonPlot([{'data': predictionDataFrame,  'name': 'prediction'},
+        model    = fitLSTM(trainInput,trainOuput,30,1,30)
+        forecast = model.predict(trainForcastInput.reshape(1,1,len(trainForcastInput)))
 
-                          {'data':futureData, 'name': 'actual'}], "../")
+        forecastInvScale = np.delete(forecast[0],0,0)
+        forecastInvScale = scaler.inverse_transform(forecastInvScale.reshape(1,-1))
+        forecastInvScale = forecastInvScale[0,:]
 
+        predictionResult[kpi] = pd.Series(forecastInvScale)
 
-    print(predictionDataFrame)
+        #GraphData.comparisonPlot([{'data': predictionResult,  'name': 'prediction'},
+        #                          {'data':futureData, 'name': 'actual'}], cfg.lstmGraphLocation)
+    predictionResult.set_index(dateTimeRange, inplace=True)
+    return predictionResult
 
 
 def calculateMAE(originalData, predictionData):
@@ -397,13 +362,39 @@ def calculateMAE(originalData, predictionData):
         maeFrame[columnLabel] = pd.Series(mae, index=["MAE"])
     return maeFrame
 
+
 def importDataFromExcel(type):
+        """
+        Import data from an excel spreadsheet
+
+        Parameters
+        ----------
+        type : determine whether data in hourly or daily
+
+        Returns
+        -------
+        ImportData object
+                object containing data in pandas dataframe
+        """
         if type == 'hourly':
             return ImportData(cfg.hourlyDataLocation, cfg.hourlySheetName)
         elif type == 'daily':
             return ImportData(cfg.dailyDataLocation, cfg.dailySheetName)
 
 def exportDataToExcel(type):
+        """
+        Export data to an excel spreadsheet
+
+        Parameters
+        ----------
+        type : determine whether data exported in algorithm statistics(stats),
+               or correlation (corrHourly, corrDaily)
+
+        Returns
+        -------
+        ExportData object
+
+        """
         if type == 'stats':
             return ExportData(cfg.writeStatsDataLocation, cfg.writeStatsDataSheetName)
         elif type == 'corrHourly':
@@ -413,18 +404,39 @@ def exportDataToExcel(type):
 
 
 def main():
+    #import hourly data
     spreadSheet1In  = importDataFromExcel('hourly')
+    #import daily data
     spreadSheet2In  = importDataFromExcel('daily')
+
+    #export stats to rate models (e.g mae)
     #spreadSheet1Out = exportDataToExcel('stats')
+
+    #export hourly correlation
     #spreadSheet3Out = exportDataToExcel('corrHourly')
+
+    #export daily correlation
     #spreadSheet2Out = exportDataToExcel('corrDaily')
 
+    #split imported data into training and future data. future data is what is predicted
     trainingData, futureData = spreadSheet1In.dataSeparation(cfg.trainingDays)
 
+    #run reference algorithm
     #forcastReference(trainingData, futureData)
+
+    #run straight arima algorithm
+    #predictionARIMA(trainingData, futureData, cfg.predictionHours)
+
+    #run straight lstm neural network algorithm
+    #predictionLSTM(trainingData, futureData, cfg.predictionHours)
+
+    #run linear regression arima algorthim
     #correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
-    #linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData)
-    LSTMPrediction(trainingData,futureData)
+    #linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "ARIMA")
+
+    #run linear regression lstm algorithm
+    correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
+    linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "LSTM")
 
 
 if __name__== "__main__":

@@ -16,3 +16,6 @@ class DataManipulation(object):
     @staticmethod
     def groupDataByDate(data):
         return data.groupby(data.index.date, sort=False)
+    @staticmethod
+    def groupDataByPredictHourMultiple(data):
+        return data.groupby(data.index // cfg.predictionHours, sort=False)

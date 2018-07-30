@@ -28,7 +28,11 @@ referenceGraphLocation = "../AlgorithmResults/ReferenceResults/"
 
 #Linear Regression Algorithm
 topNCorrelations = 5
-lrGraphLocation = "../AlgorithmResults/LinearRegressionARIMAResults/"
+lrARIMAGraphLocation = "../AlgorithmResults/LinearRegressionARIMAResults/"
+lrLSTMGraphLocation = "../AlgorithmResults/LinearRegressionLSTMResults/"
+
+#LSTM Algorithm
+lstmGraphLocation = "../AlgorithmResults/StraightLSTMResults/"
 
 #Correlation Threshold
 dailyCorrThreshold  = 0.9

@@ -31,4 +31,11 @@ Scipy
 Increase training data size: change value in config file
 
 
-Assumption Made: Prediction Forecast Hours <= 24
+########Current Limitations##############
+
+Prediction Forecast Must BE Hours = 24. This is because of LSTM implementation. ARIMA will work for <= 24
+
+Linear Regression Algorithm will only work on KPIs that have one or more correlating KPIs. One should use Straight ARIMA,Straight LSTM or reference to model rest
+
+
+

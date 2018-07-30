@@ -7,7 +7,11 @@ from statsmodels.tsa.stattools import acf,pacf
 from statsmodels.tsa.arima_model import ARIMA
 from statsmodels.tsa.arima_model import ARMAResults
 from sklearn import datasets, linear_model
+from sklearn.preprocessing import MinMaxScaler
 from scipy.optimize import brute
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.layers import LSTM
 
 from iodata import ExportData, ImportData
 from graphdata import GraphData
@@ -278,10 +282,67 @@ def seasonalARIMA(trainingData, futureData):
 -------------------------------------------------------------------------------
 LSTM Neural Network
 """
-def series
+# convert time series into supervised learning problem
+def toSupervisedStructure(trainingData, n_in=1, n_out=1, dropnan=True):
+    data = trainingData
+    n_vars = 1
+    df = pd.DataFrame(data)
+    cols, names = list(), list()
+	# input sequence (t-n, ... t-1)
+    for i in range(n_in, 0, -1):
+        cols.append(df.shift(i))
+        names += [('var%d(t-%d)' % (j+1, i)) for j in range(n_vars)]
+	# forecast sequence (t, t+1, ... t+n)
+    for i in range(0, n_out):
+        cols.append(df.shift(-i))
+        if i == 0:
+            names += [('var%d(t)' % (j+1)) for j in range(n_vars)]
+        else:
+            names += [('var%d(t+%d)' % (j+1, i)) for j in range(n_vars)]
+	# put it all together
+    agg = pd.concat(cols, axis=1)
+    agg.columns = names
+	# drop rows with NaN values
+    if dropnan:
+        agg.dropna(inplace=True)
+    return agg
+
+def fitLSTM(trainingData, nlag, nneurons, nbatch, nepoch):
+    X,y = trainingData[:, 0:nlag] , trainingData[:, nlag:]
+    X = X.reshape(X.shape[0],1,X.shape[1])
+
+    model = Sequential()
+    model.add(LSTM(nneurons, batch_input_shape=(nbatch,X.shape[1],X.shape[2])))
+    model.add(Dense(y.shape[1]))
+    model.compile(loss="mean_squared_error", optimizer='adam')
+
+    for i in range (nepoch):
+        model.fit(X,y,epochs=1, batch_size=nbatch, verbose=0, shuffle=False)
+        model.reset_states()
+
+    return model
 
 
 
+def LSTMPrediction(trainingData):
+    columnTarget = trainingData['Avg IP thp DL QCI8']
+    scaler = MinMaxScaler(feature_range=(-1,1))
+    scaledColumnTarget = scaler.fit_transform(columnTarget.values[1:].reshape(-1,1))
+
+    supervisedData = toSupervisedStructure(scaledColumnTarget, 3, 3)
+
+    print(supervisedData.values)
+    print(supervisedData.values[-1][3:])
+    test = supervisedData.values[-1][3:]
+
+    model = fitLSTM(supervisedData.values,3,50,1,100)
+
+    forecast = model.predict(test.reshape(1,1, len(test)))
+
+    inv_scale = scaler.inverse_transform(forecast[0].reshape(1,-1))
+    print (inv_scale)
+    inv_scale = inv_scale[0,:]
+    print (inv_scale)
 
 
 
@@ -323,9 +384,9 @@ def main():
     trainingData, futureData = spreadSheet1In.dataSeparation(cfg.trainingDays)
 
     #forcastReference(trainingData, futureData)
-    correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
-    linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData)
-
+    #correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
+    #linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData)
+    LSTMPrediction(trainingData)
 
 
 if __name__== "__main__":

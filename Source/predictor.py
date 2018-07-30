@@ -9,130 +9,16 @@ from statsmodels.tsa.arima_model import ARMAResults
 from sklearn import datasets, linear_model
 from scipy.optimize import brute
 
-
-
-class ExportData(object):
-    fileName = ""
-    sheet    = ""
-
-    def __init__(self,fileName,sheet):
-        self.fileName = fileName
-        self.sheet    = sheet
-
-    def writeExcelData(self, data):
-        writer = pd.ExcelWriter(self.fileName)
-        data.to_excel(writer,self.sheet)
-        writer.save()
-
-
-class ImportData(object):
-        fileName    = ""
-        sheet       = ""
-        dataFrame   = pd.DataFrame()
-
-        def __init__(self,fileName,sheet):
-            self.fileName = fileName
-            self.sheet    = sheet
-            self.readDataSheet()
-            self.parseDate()
-            self.setDataUp()
-
-        #Read Excel Data Sheet And Store in DataFrame
-        def readDataSheet(self):
-            self.dataFrame = pd.read_excel(self.fileName, self.sheet)
-            return self.dataFrame
-
-        #Parse Time Data As DateTime Object
-        def parseDate(self):
-            if 'Period start time' in self.dataFrame:
-                self.dataFrame['Period start time'] = pd.to_datetime(self.dataFrame['Period start time'], format="%d/%m/%Y %H:%M:%S", utc=True, errors='coerce')
-
-        def setDataUp(self):
-            #Set datetime to be index
-            self.dataFrame.set_index('Period start time', inplace=True)
-            #Drop PLMN tag
-            self.dataFrame.drop('PLMN Name', axis=1, inplace=True)
-            #Drop all columns more than 90% empty
-            self.dataFrame.dropna(axis=1, thresh=0.9*len(self.dataFrame), inplace=True)
-            #Drop rows with index NaT
-            self.dataFrame = self.dataFrame.loc[pd.notnull(self.dataFrame.index)]
-            #Drop rows with all NaN
-            self.dataFrame.dropna(axis=0, how='all', inplace=True)
-            #Make sure columns are numeric
-            self.dataFrame = self.dataFrame.apply(pd.to_numeric, errors='ignore')
-
-        def dataSeparation(self, trainingDays):
-            dailyGroupedData = DataManipulation.groupDataByDay(self.dataFrame)
-            firstDay         = next(iter(dailyGroupedData.groups))
-            trainingData     = pd.DataFrame()
-            forcastData      = pd.DataFrame()
-
-            for day, dayReadings in dailyGroupedData:
-                if day <= firstDay + trainingDays:
-                    trainingData = trainingData.append(dayReadings)
-                else:
-                    forcastData = forcastData.append(dayReadings)
-
-            return (trainingData, forcastData)
-
-class DataManipulation(object):
-    @staticmethod
-    def groupDataByDay(data):
-        return data.groupby(data.index.dayofyear, sort=False)
-    @staticmethod
-    def groupDataByDayName(data):
-            return data.groupby(data.index.weekday, sort=False)
-
-
-class GraphData(object):
-        @staticmethod
-        def saveFigure(fig,w_inches, h_inches, location):
-            fig.set_size_inches(w_inches, h_inches)
-            plt.savefig(location, dpi=100, format='png')
-
-        @staticmethod
-        def createFigure(title):
-            fig = plt.figure()
-            plt.title(title)
-            return fig
-
-        @staticmethod
-        def comparisonPlot(dataDicList, storeLocation):
-            for columnLabel, _ in dataDicList[0]['data'].iteritems():
-                fig = GraphData.createFigure(columnLabel)
-                for dic in dataDicList:
-                    plt.plot(dic['data'][columnLabel], label = dic['name'] )
-                    plt.legend(loc='upper left')
-                GraphData.saveFigure(fig,10,6, storeLocation + columnLabel)
-        @staticmethod
-        def formPlotDictionary(name, data):
-            return {'name': name, 'data': data}
-
+from iodata import ExportData, ImportData
+from graphdata import GraphData
+from manipulatedata import DataManipulation
+from correlation import Correlation
 
 """
 -------------------------------------------------------------------------------
 Reference Algorithm
 """
-
-def calculateMeanAverage(windowData,windowSize, newData):
-    windowData = windowData.append(newData)
-    if (len(windowData.index) > windowSize):
-        windowData = windowData.iloc[1:]
-        return windowData, windowData.mean()
-    return windowData, pd.Series()
-
-def referenceAlgorithm(spreadSheetIn, windowSize):
-    predictionData = pd.DataFrame()
-    windowData     = pd.DataFrame()
-    forcastSeries  = pd.Series()
-
-    for index, hourReading in spreadSheetIn.dataFrame.iterrows():
-        forcastSeries.name = index
-        predictionData = predictionData.append(forcastSeries)
-        windowData, forcastSeries = calculateMeanAverage(windowData, windowSize, hourReading)
-    return predictionData
-
-def calculateMeanAverage2(time, trainingData):
+def calculateMeanAverage(time, trainingData):
     prevDayTime  = time - pd.Timedelta(days=1)
     prevWeekTime = time - pd.Timedelta(days=7)
 
@@ -144,94 +30,115 @@ def calculateMeanAverage2(time, trainingData):
 
     return meanTimeForcast
 
-def referenceAlgorithm2(trainingData):
-    #Forcast Next Day
+def referenceAlgorithm(trainingData):
     predictionData = pd.DataFrame()
-    timeRange = pd.date_range(start=(trainingData.index.values[-1] + pd.Timedelta(hours=1)), periods=24, freq='H')
+    timeRange = pd.date_range(start=(trainingData.index.values[-1] + pd.Timedelta(hours=1)), periods=cfg.predictionHours, freq='H')
     for time in timeRange:
         predictionData = predictionData.append(calculateMeanAverage2(time, trainingData))
     predictionData.index.name = 'Period start time'
     return predictionData
 
-
-"""
--------------------------------------------------------------------------------
--------------------------------------------------------------------------------
-First Correlation Algorithm
-"""
-def correlation(spreadSheetIn, spreadSheetOut, upperThreshold):
-    #Correlation is always absolute value
-    correlations = spreadSheetIn.dataFrame.corr()
-    correlations = correlations.applymap(lambda x: abs(x) if abs(x) > upperThreshold else 0)
-    correlationResult = pd.DataFrame()
-
-    for kpiName, kpiCorrelations in correlations.iterrows():
-        kpiCorrelations = kpiCorrelations[kpiCorrelations != 0]
-        kpiCorrelations = kpiCorrelations[kpiCorrelations != 1]
-        correlationResult = correlationResult.append(pd.Series(kpiCorrelations, name= kpiName))
-
-    spreadSheetOut.writeExcelData(correlationResult)
-    return correlationResult
-
-"""
--------------------------------------------------------------------------------
-"""
+def forcastReference(trainingData, futureData):
+    predictionData = referenceAlgorithm(trainingData)
+    GraphData.comparisonPlot([formPlotDictionary("prediction", predictionData),
+                              formPlotDictionary("actual", futureData.head(len(predictionData)))],cfg.referenceGraphLocation)
 
 
 """
--------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
 Regression Algorithm
 """
-
 def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData):
-    #E.g. Avg act UEs DL
-    correlationSeries = correlationHourlyData['Avg act UEs DL']
-    topCorrelationKPIs = correlationSeries.sort_values(ascending=False)
-    topCorrelationKPIs.dropna(inplace=True)
-    topCorrelationKPIs = topCorrelationKPIs.head(5)
+    for kpi in trainingData:
+        print (kpi)
+        if kpi not in correlationHourlyData.columns:
+            print("KPI has no dependencies")
+        else:
+            correlationSeries = correlationHourlyData[kpi]
+            topCorrelationKPIs = correlationSeries.sort_values(ascending=False)
+            topCorrelationKPIs.dropna(inplace=True)
+            topCorrelationKPIs = topCorrelationKPIs.head(cfg.topNCorrelations)
 
-    topCorrelationKPIsNames  = topCorrelationKPIs.index.values
-    topCorrelationKPIsValues = trainingData[topCorrelationKPIs.index.values].values
+            topCorrelationKPIsNames  = topCorrelationKPIs.index.values
+            topCorrelationKPIsValues = trainingData[topCorrelationKPIs.index.values].values
 
-    targetKPI = trainingData['Avg act UEs DL']
-    targetKPI = targetKPI.values
+            targetKPI = trainingData[kpi]
+            targetKPI = targetKPI.values
 
-    regr = linear_model.LinearRegression()
-    regr.fit(topCorrelationKPIsValues, targetKPI)
+            regr = linear_model.LinearRegression()
+            regr.fit(topCorrelationKPIsValues, targetKPI)
 
-    forcastTopCorrelationKPIsValues = analyseARIMA2(trainingData[topCorrelationKPIsNames],
+            forcastTopCorrelationKPIsValues = predictionARIMA(trainingData[topCorrelationKPIsNames],
                                                     futureData[topCorrelationKPIsNames],
                                                     cfg.predictionHours)
-    print( topCorrelationKPIsNames)
-    print (forcastTopCorrelationKPIsValues.columns)
+            print( topCorrelationKPIsNames)
+            print (forcastTopCorrelationKPIsValues.columns)
 
-    forcastTargetKPIValues = regr.predict(forcastTopCorrelationKPIsValues.values)
-    predictionResult = pd.DataFrame()
-    predictionResult['Avg act UEs DL'] = forcastTargetKPIValues
-    predictionResult.set_index(forcastTopCorrelationKPIsValues.index, inplace=True)
-    print (predictionResult)
+            forcastTargetKPIValues = regr.predict(forcastTopCorrelationKPIsValues.values)
+            predictionResult = pd.DataFrame()
+            predictionResult[kpi] = forcastTargetKPIValues
+            predictionResult.set_index(forcastTopCorrelationKPIsValues.index, inplace=True)
 
-    GraphData.comparisonPlot([{'data': predictionResult, 'name': 'prediction'},
-                             {'data':futureData, 'name': 'actual'}], '../LinearRegression/')
-    return predictionResult
+            predictionStdUpperLimit = pd.DataFrame(index = forcastTopCorrelationKPIsValues.index)
+            predictionStdLowerLimit = pd.DataFrame(index = forcastTopCorrelationKPIsValues.index)
+            predictionShiftLimit = forcastLimits(trainingData,cfg.predictionHours,kpi).multiply(cfg.forcastLimitMultiplicationConstant)
 
-    
+            predictionStdUpperLimit[kpi] = predictionResult[kpi].add(predictionShiftLimit)
+            predictionStdLowerLimit[kpi] = predictionResult[kpi].subtract(predictionShiftLimit)
 
+            GraphData.comparisonPlot([{'data': predictionResult, 'dependencies': topCorrelationKPIsNames, 'name': 'prediction'},
+                              {'data': predictionStdUpperLimit, 'style': '--', 'name': "upperlimit"},
+                              {'data': predictionStdLowerLimit, 'style': '--', 'name': "lowerlimit"},
+                              {'data':futureData, 'name': 'actual'}], cfg.lrGraphLocation)
 
-    #print (forcastTopCorrelationKPIsValues)
-    #print( topCorrelationKPIsValues)
+#------Forcast Limits--------------
+def forcastLimits(trainingData, predictionHours, kpi):
+    groupedByDayName = DataManipulation.groupDataByDayName(trainingData)
+    firstDateTime = pd.to_datetime(trainingData.index.values[-1]) + pd.Timedelta(hours=1)
+    if (firstDateTime + pd.Timedelta(hours=predictionHours)).date() == firstDateTime.date():
+        dateTimeRangeDay1 = pd.date_range(start=(firstDateTime), end = firstDateTime + pd.Timedelta(hours=predictionHours), freq='H')
+    else:
+        dateTimeRangeDay1 = pd.date_range(start=(firstDateTime),
+                              end=pd.Timestamp(year=firstDateTime.year, month=firstDateTime.month, day=firstDateTime.day, hour=23),
+                              freq='H')
+    dateTimeRangeDay2 = pd.date_range(start=pd.Timestamp(year=firstDateTime.year, month=firstDateTime.month, day=firstDateTime.day) + pd.DateOffset(1), periods=predictionHours-len(dateTimeRangeDay1), freq='H')
 
-    #regr.predict(X)
+    forcastLengthDay1 = len(dateTimeRangeDay1)
+    forcastLengthDay2 = len(dateTimeRangeDay2)
+
+    day1Name = dateTimeRangeDay1.weekday[0]
+    day2Name = (day1Name + 1) % 7
+
+    day1Data = groupedByDayName.get_group(day1Name)
+    day2Data = groupedByDayName.get_group(day2Name)
+
+    day1KPIData = day1Data[kpi]
+    day2KPIData = day2Data[kpi]
+
+    if forcastLengthDay2 > 0:
+        day1KPIRollingStd = day1KPIData.rolling(cfg.forcastLimitWindowSize, min_periods=1, center=True).std()
+        day2KPIRollingStd = day2KPIData.rolling(cfg.forcastLimitWindowSize, min_periods=1, center=True).std()
+
+        day1GroupedByTime = DataManipulation.groupDataByTime(day1KPIRollingStd)
+        day2GroupedByTime = DataManipulation.groupDataByTime(day2KPIRollingStd)
+
+        day1KPIAvgRollingStd = dateTimeRangeDay1.to_series().map(lambda dateTime: day1GroupedByTime.get_group(dateTime.time()).mean())
+        day2KPIAvgRollingStd = dateTimeRangeDay2.to_series().map(lambda dateTime: day2GroupedByTime.get_group(dateTime.time()).mean())
+
+        return day1KPIAvgRollingStd.append(day2KPIAvgRollingStd)
+    else:
+        day1KPIRollingStd = day1KPIData.rolling(cfg.forcastLimitWindowSize, min_periods=1, center=True).std()
+        day1GroupedByTime = DataManipulation.groupDataByTime(day1KPIRollingStd)
+        day1KPIAvgRollingStd = dateTimeRangeDay1.to_series().map(lambda dateTime: day1GroupedByTime.get_group(dateTime.time()).mean())
+        return day1KPIAvgRollingStd
 
 
 """
--------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
 ARIMA
 """
-def analyseARIMA(trainingData):
-    targetColumn = trainingData['Avg act UEs DL']
+def analyseARIMA(trainingData, kpi):
+    targetColumn = trainingData[kpi]
     lag_acf  = acf(targetColumn,  nlags=170)
     lag_pacf = pacf(targetColumn, nlags=170, method='ols')
 
@@ -244,7 +151,6 @@ def analyseARIMA(trainingData):
     plt.xlabel('Lag')
     plt.ylabel('ACF')
 
-
     plt.subplot(122)
     plt.stem(lag_pacf)
     plt.axhline(y=0, linestyle='-', color='black')
@@ -256,10 +162,10 @@ def analyseARIMA(trainingData):
     plt.tight_layout()
     plt.show()
 
-def arimaModel(order,day1KPIData):
+def arimaModel(order,kpiData):
     print(order)
     try:
-        model       = ARIMA(day1KPIData, order=order)
+        model       = ARIMA(kpiData, order=order)
         model1Result= model.fit(disp=0)
         residuals = pd.DataFrame(model1Result.resid)
         print(residuals)
@@ -276,20 +182,23 @@ def arimaModel(order,day1KPIData):
         return 10**10
 
 
-
-def analyseARIMA2(trainingData, futureData, predictionHours):
+def predictionARIMA(trainingData, futureData, predictionHours):
     #Assuming prediction hours <= 24
     groupedByDayName = DataManipulation.groupDataByDayName(trainingData)
     firstDateTime = pd.to_datetime(trainingData.index.values[-1]) + pd.Timedelta(hours=1)
-    timeRangeDay1 = pd.date_range(start=(firstDateTime),
+
+    if (firstDateTime + pd.Timedelta(hours=predictionHours)).date() == firstDateTime.date():
+        dateTimeRangeDay1 = pd.date_range(start=(firstDateTime), end = firstDateTime + pd.Timedelta(hours=predictionHours), freq='H')
+    else:
+        dateTimeRangeDay1 = pd.date_range(start=(firstDateTime),
                               end=pd.Timestamp(year=firstDateTime.year, month=firstDateTime.month, day=firstDateTime.day, hour=23),
                               freq='H')
-    timeRangeDay2 = pd.date_range(start=pd.Timestamp(year=firstDateTime.year, month=firstDateTime.month, day=firstDateTime.day) + pd.DateOffset(1), periods=predictionHours-len(timeRangeDay1), freq='H')
+    dateTimeRangeDay2 = pd.date_range(start=pd.Timestamp(year=firstDateTime.year, month=firstDateTime.month, day=firstDateTime.day) + pd.DateOffset(1), periods=predictionHours-len(dateTimeRangeDay1), freq='H')
 
-    forcastLengthDay1 = len(timeRangeDay1)
-    forcastLengthDay2 = len(timeRangeDay2)
+    forcastLengthDay1 = len(dateTimeRangeDay1)
+    forcastLengthDay2 = len(dateTimeRangeDay2)
 
-    day1Name = timeRangeDay1.weekday[0]
+    day1Name = dateTimeRangeDay1.weekday[0]
     day2Name = (day1Name + 1) % 7
 
     day1Data = groupedByDayName.get_group(day1Name)
@@ -330,22 +239,22 @@ def analyseARIMA2(trainingData, futureData, predictionHours):
         if predictionDataDay2 == None:
             forcastData = predictionDataDay1[0]
             predictionResult[kpi] = forcastData
-            predictionResult.set_index(timeRangeDay1, inplace=True)
+            predictionResult.set_index(dateTimeRangeDay1, inplace=True)
         else:
-            forcastData = predictionDataDay1[0] + predictionDataDay2[0]
-            predictionResult[kpi] = forcastData
-            predictionResult.set_index(timeRangeDay1.append(timeRangeDay2), inplace =True)
-    GraphData.comparisonPlot([{'data': predictionResult, 'name': 'prediction'},
-                             {'data':futureData, 'name': 'actual'}], '../LinearRegression/')
+            print(predictionDataDay1[0])
+            print(predictionDataDay2[0])
+            forecastData = np.concatenate([predictionDataDay1[0], predictionDataDay2[0]])
+            print (forecastData)
+            predictionResult[kpi] = forecastData
+            predictionResult.set_index(dateTimeRangeDay1.append(dateTimeRangeDay2), inplace =True)
+    #GraphData.comparisonPlot([{'data': predictionResult, 'name': 'prediction'},
+    #                         {'data':futureData, 'name': 'actual'}], '../LinearRegression/')
     return predictionResult
 
 """
 def seasonalARIMA(trainingData, futureData):
     targetColumn = trainingData['Avg act UEs DL']
     targetData = pd.concat([targetColumn, targetColumn],ignore_index=True)
-
-
-
     #model = SARIMAX(targetData, order= (2,1,1), seasonal_order=(1,0,1,168), enforce_stationarity=False, enforce_invertibility=False)
     #model_fit = model.fit(disp=False)
 
@@ -364,6 +273,22 @@ def seasonalARIMA(trainingData, futureData):
 -------------------------------------------------------------------------------
 """
 
+
+"""
+-------------------------------------------------------------------------------
+LSTM Neural Network
+"""
+def series
+
+
+
+
+
+
+
+
+
+
 def calculateMAE(originalData, predictionData):
     maeFrame = pd.DataFrame()
     for columnLabel, _ in originalData.iteritems():
@@ -381,47 +306,25 @@ def importDataFromExcel(type):
 
 def exportDataToExcel(type):
         if type == 'stats':
-            return ExportData(cfg.writeNewDataLocation, cfg.writeNewDataSheetName)
+            return ExportData(cfg.writeStatsDataLocation, cfg.writeStatsDataSheetName)
         elif type == 'corrHourly':
             return ExportData(cfg.writeCorrelationHourlyLocation, cfg.writeCorrelationHourlySheetName)
         elif type == 'corrDaily':
             return ExportData(cfg.writeCorrelationDailyLocation, cfg.writeCorrelationSDailySheetName)
 
-def forcastReference(trainingData, futureData):
-    predictionData = referenceAlgorithm2(trainingData)
-    GraphData.comparisonPlot([formPlotDictionary("prediction", predictionData),
-                              formPlotDictionary("actual", futureData.head(len(predictionData)))],cfg.referenceGraphLocation)
-
 
 def main():
     spreadSheet1In  = importDataFromExcel('hourly')
-    spreadSheet1Out = exportDataToExcel('stats')
-    spreadSheet3Out = exportDataToExcel('corrHourly')
-
     spreadSheet2In  = importDataFromExcel('daily')
-    spreadSheet2Out = exportDataToExcel('corrDaily')
+    #spreadSheet1Out = exportDataToExcel('stats')
+    #spreadSheet3Out = exportDataToExcel('corrHourly')
+    #spreadSheet2Out = exportDataToExcel('corrDaily')
 
     trainingData, futureData = spreadSheet1In.dataSeparation(cfg.trainingDays)
 
     #forcastReference(trainingData, futureData)
-
-    #correlationDailyData  = correlation(spreadSheet2In, spreadSheet2Out, cfg.dailyThreshold)
-    correlationHourlyData = correlation(spreadSheet1In, spreadSheet3Out, cfg.hourlyThreshold)
+    correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
     linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData)
-    #analyseARIMA(trainingData)
-    #test(trainingData)
-    #seasonalARIMA(trainingData,futureData)
-    #analyseARIMA2(trainingData,futureData, cfg.predictionHours)
-
-
-    #predictionData = referenceAlgorithm(spreadSheet1In, cfg.referenceWindowSize)
-    #GraphData.comparisonPlot([spreadSheet1In.dataFrame, predictionData], cfg.referenceGraphLocation)
-
-
-
-
-    #maeFrame = calculateMAE(spreadSheet1In.dataFrame, predictionData)
-    #spreadSheet1Out.writeExcelData(maeFrame)
 
 
 

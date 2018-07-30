@@ -1,0 +1,34 @@
+
+#############Layout################
+1* Algorithm found  : Source/predictor.py
+2* Config file found: Source/config.py
+All other dependent files are also found in Source/*.py (can ignore NNSource and PlotSource folder)
+
+3* Data found: Data/*
+4* Visual and Experimental Results just for intuition found: DailyResults/*, HourlyResults/*
+
+
+1* contains the main function which can be run : python3 predictor.py
+1* contains currently:
+	Reference Algorithm
+	ARIMA forcast Algorithm
+	Combined ARIMA with Linear Regression Algorithm
+
+
+2* contains constants that can be altered including location to store plots : Default in AlgorithmResults folder
+
+
+############Dependencies###############
+Pandas
+Matplotlib.pyplot
+Numpy
+Statsmodels
+Scikitlearn
+Scipy
+
+####################################
+
+Increase training data size: change value in config file
+
+
+Assumption Made: Prediction Forecast Hours <= 24

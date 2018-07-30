@@ -21,7 +21,6 @@ writeCorrelationHourlySheetName = "Sheet1"
 predictionHours = 24
 trainingDays = 14
 
-
 #Reference Algorithm
 referenceWindowSize = 4
 referenceGraphLocation = "../AlgorithmResults/ReferenceResults/"

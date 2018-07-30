@@ -23,6 +23,22 @@ from correlation import Correlation
 Reference Algorithm
 """
 def calculateMeanAverage(time, trainingData):
+    """
+    Work out mean average between series day before and series week before
+
+    Parameters
+    ----------
+    time: datetime
+        time point we want to forecast
+        
+    trainingData : pandas dataframe
+        training data containing one or more KPIs
+
+    Returns
+    -------
+    pandas dataframe
+        predicted data
+    """
     prevDayTime  = time - pd.Timedelta(days=1)
     prevWeekTime = time - pd.Timedelta(days=7)
 
@@ -35,6 +51,20 @@ def calculateMeanAverage(time, trainingData):
     return meanTimeForcast
 
 def referenceAlgorithm(trainingData):
+    """
+    Prediction of future data time points using average of time point
+    from previous day and previous week
+
+    Parameters
+    ----------
+    trainingData : pandas dataframe
+        training data containing one or more KPIs
+
+    Returns
+    -------
+    pandas dataframe
+        predicted data
+    """
     predictionData = pd.DataFrame()
     timeRange = pd.date_range(start=(trainingData.index.values[-1] + pd.Timedelta(hours=1)), periods=cfg.predictionHours, freq='H')
     for time in timeRange:

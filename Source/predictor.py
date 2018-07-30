@@ -148,6 +148,10 @@ def forcastLimits(trainingData, predictionHours, kpi):
 ARIMA
 """
 def analyseARIMA(trainingData, kpi):
+    """
+    Analyse training Data to show autocorrelation and partial autocorrelation
+    """
+
     targetColumn = trainingData[kpi]
     lag_acf  = acf(targetColumn,  nlags=170)
     lag_pacf = pacf(targetColumn, nlags=170, method='ols')
@@ -172,10 +176,26 @@ def analyseARIMA(trainingData, kpi):
     plt.tight_layout()
     plt.show()
 
-def arimaModel(order,kpiData):
+def arimaModel(order,trainingData):
+    """
+    Create ARIMA model
+
+    Parameters
+    ----------
+    order : tuple(p,d,q)
+        The parameters for the arima model
+    trainingData: pandas series
+        Training data for one kpi
+
+    Returns
+    -------
+    int
+        If no exception - residual standard deviation, how well model fits training data
+        Else - 10**10 (large number)
+    """
     print(order)
     try:
-        model       = ARIMA(kpiData, order=order)
+        model       = ARIMA(trainingData, order=order)
         model1Result= model.fit(disp=0)
         residuals = pd.DataFrame(model1Result.resid)
         print(residuals)
@@ -193,7 +213,24 @@ def arimaModel(order,kpiData):
 
 
 def predictionARIMA(trainingData, futureData, predictionHours):
-    #Assuming prediction hours <= 24
+    """
+    Predict future data based on training data. Uses standard arima with grid search
+    of parameters to find optimum to model per kpi how it progresses over time
+
+    Parameters
+    ----------
+    trainingData : pandas dataframe
+        contains data for one or more KPIs. Index must be a DateTimeIndex
+    futureData: pandas dataframe
+        contains data for one or more KPIs which should be forecasted. Index must be a DateTimeIndex
+    predictionHours: int
+        number of hours to predict
+
+    Returns
+    -------
+    pandas dataframe
+        prediction outcome of one or more KPIs forcastedd. Index must be a DateTimeIndex
+    """
     groupedByDayName = DataManipulation.groupDataByDayName(trainingData)
     firstDateTime = pd.to_datetime(trainingData.index.values[-1]) + pd.Timedelta(hours=1)
 
@@ -224,8 +261,6 @@ def predictionARIMA(trainingData, futureData, predictionHours):
         try:
             grid = (slice(1,8,1), slice(0,3,1), slice(0,3,1))
             optimizeOrderPara = brute(arimaModel, grid, args=[(day1KPIDataReset)], finish=None)
-            print("OPTIMISED")
-            print(optimizeOrderPara)
             model1 = ARIMA(day1KPIDataReset, order=(int(optimizeOrderPara[0]),int(optimizeOrderPara[1]),int(optimizeOrderPara[2]))).fit(disp=0)
 
         except:
@@ -237,8 +272,6 @@ def predictionARIMA(trainingData, futureData, predictionHours):
             try:
                 grid = (slice(1,8,1), slice(0,3,1), slice(0,3,1))
                 optimizeOrderPara = brute(arimaModel, grid, args=[(day1KPIDataReset)], finish=None)
-                print("OPTIMISED")
-                print(optimizeOrderPara)
                 model2 = ARIMA(day1KPIDataReset, order=(int(optimizeOrderPara[0]),int(optimizeOrderPara[1]),int(optimizeOrderPara[2]))).fit(disp=0)
 
             except:
@@ -288,20 +321,60 @@ def seasonalARIMA(trainingData, futureData):
 -------------------------------------------------------------------------------
 LSTM Neural Network
 """
-def fitLSTM(train, test, nneurons, nbatch, nepoch):
-    X = train.reshape(train.shape[0], 1, train.shape[1])
+def fitLSTM(trainInput, trainOutput, nneurons, nbatch, nepoch):
+    """
+    Create LSTM model
+
+    Parameters
+    ----------
+    trainInput : np array
+        model training input
+    trainOuput:  np array
+        model training output used in backpropagation to alter weights
+    nneurons: int
+        neuron number in hidden layer
+    nbatch: int
+        batch number
+    nepoch: int
+        epoch number
+
+    Returns
+    -------
+    Sequential object
+        fitted model to training data
+    """
+    X = trainInput.reshape(trainInput.shape[0], 1, trainInput.shape[1])
 
     model = Sequential()
     model.add(LSTM(nneurons, batch_input_shape=(nbatch, X.shape[1], X.shape[2])))
-    model.add(Dense(test.shape[1]))
+    model.add(Dense(trainOutput.shape[1]))
     model.compile(loss="mean_squared_error", optimizer='adam')
 
     for i in range (nepoch):
-        model.fit(X,test,epochs=1, batch_size=nbatch, verbose=0, shuffle=False)
+        model.fit(X,trainOutput,epochs=1, batch_size=nbatch, verbose=0, shuffle=False)
         model.reset_states()
     return model
 
 def predictionLSTM(trainingData,futureData, predictionHours):
+    """
+    Predict future data based on training data. Makes use of long short
+    term memory neural network per kpi to model how it progresses over time
+
+    Parameters
+    ----------
+    trainingData : pandas dataframe
+        contains data for one or more KPIs. Index must be a DateTimeIndex
+    futureData: pandas dataframe
+        contains data for one or more KPIs which should be forecasted. Index must be a DateTimeIndex
+    predictionHours: int
+        number of hours to predict
+
+    Returns
+    -------
+    pandas dataframe
+        prediction outcome of one or more KPIs forcastedd. Index must be a DateTimeIndex
+    """
+
     # TODO: MAY NEED TO CHECK IF STATIONARY AND THEN INVERT AT END
 
     removeFirstNRows = len(trainingData) % predictionHours
@@ -369,7 +442,8 @@ def importDataFromExcel(type):
 
         Parameters
         ----------
-        type : determine whether data in hourly or daily
+        type : string
+            determine whether data in hourly or daily
 
         Returns
         -------
@@ -387,7 +461,8 @@ def exportDataToExcel(type):
 
         Parameters
         ----------
-        type : determine whether data exported in algorithm statistics(stats),
+        type : string
+            determine whether data exported in algorithm statistics(stats),
                or correlation (corrHourly, corrDaily)
 
         Returns

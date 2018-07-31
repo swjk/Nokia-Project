@@ -359,8 +359,8 @@ def predictionARIMA(trainingData, futureData, predictionHours):
             print (forecastData)
             predictionResult[kpi] = forecastData
             predictionResult.set_index(dateTimeRangeDay1.append(dateTimeRangeDay2), inplace =True)
-    #GraphData.comparisonPlot([{'data': predictionResult, 'name': 'prediction'},
-    #                         {'data':futureData, 'name': 'actual'}], cfg.lrARIMAGraphLocation)
+        #GraphData.comparisonPlot([{'data': predictionResult, 'name': 'prediction'},
+        #                             {'data':futureData, 'name': 'actual'}], cfg.)
     return predictionResult
 
 """
@@ -569,7 +569,7 @@ def main():
     #forcastReference(trainingData, futureData)
 
     #run straight arima algorithm
-    predictionARIMA(trainingData, futureData, cfg.predictionHours)
+    #predictionARIMA(trainingData, futureData, cfg.predictionHours)
 
     #run straight lstm neural network algorithm
     #predictionLSTM(trainingData, futureData, cfg.predictionHours)
@@ -579,8 +579,8 @@ def main():
     #linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "ARIMA")
 
     #run linear regression lstm algorithm
-    #correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
-    #linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "LSTM")
+    correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
+    linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "LSTM")
 
 
 if __name__== "__main__":

@@ -36,7 +36,7 @@ lrLSTMGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "Linea
 lstmGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "StraightLSTMResults")
 
 #ARIMA Algorithm
-lrARIMAGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "StraightARIMAResults")
+arimaGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "StraightARIMAResults")
 
 #Correlation Threshold
 dailyCorrThreshold  = 0.9

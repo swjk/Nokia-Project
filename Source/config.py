@@ -1,20 +1,22 @@
+import os
+
 #Hourly Data Location
-hourlyDataLocation = "../Data/HourlyData.xlsx"
+hourlyDataLocation = os.path.join(os.getcwd(), "..", "Data", "HourlyData.xlsx")
 hourlySheetName    = "reportRaw1"
 
 #Weekly Data Location
-dailyDataLocation = "../Data/DailyData.xlsx"
+dailyDataLocation = os.path.join(os.getcwd(), "..", "Data", "DailyData.xlsx")
 dailySheetName    = "Data"
 
 #Write Stats About Algorithm Location
-writeStatsDataLocation     = "../Data/NewData.xlsx"
+writeStatsDataLocation     = os.path.join(os.getcwd(), "..", "Data", "NewData.xlsx")
 writeStatsDataSheetName    = "Sheet1"
 
 #Write Correlation Data
-writeCorrelationDailyLocation  = "../Data/CorrelationDaily.xlsx"
+writeCorrelationDailyLocation  = os.path.join(os.getcwd(), "..", "Data", "CorrelationDaily.xlsx")
 writeCorrelationSDailySheetName = "Sheet1"
 
-writeCorrelationHourlyLocation = "../Data/CorrelationHourly.xlsx"
+writeCorrelationHourlyLocation = os.path.join(os.getcwd(), "..", "Data", "CorrelationHourly.xlsx")
 writeCorrelationHourlySheetName = "Sheet1"
 
 #General
@@ -23,15 +25,18 @@ trainingDays = 14
 
 #Reference Algorithm
 referenceWindowSize = 4
-referenceGraphLocation = "../AlgorithmResults/ReferenceResults/"
+referenceGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "ReferenceResults")
 
 #Linear Regression Algorithm
 topNCorrelations = 5
-lrARIMAGraphLocation = "../AlgorithmResults/LinearRegressionARIMAResults/"
-lrLSTMGraphLocation = "../AlgorithmResults/LinearRegressionLSTMResults/"
+lrARIMAGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "LinearRegressionARIMAResults")
+lrLSTMGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "LinearRegressionLSTMResults")
 
 #LSTM Algorithm
-lstmGraphLocation = "../AlgorithmResults/StraightLSTMResults/"
+lstmGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "StraightLSTMResults")
+
+#ARIMA Algorithm
+lrARIMAGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "StraightARIMAResults")
 
 #Correlation Threshold
 dailyCorrThreshold  = 0.9

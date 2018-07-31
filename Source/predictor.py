@@ -68,14 +68,14 @@ def referenceAlgorithm(trainingData):
     predictionData = pd.DataFrame()
     timeRange = pd.date_range(start=(trainingData.index.values[-1] + pd.Timedelta(hours=1)), periods=cfg.predictionHours, freq='H')
     for time in timeRange:
-        predictionData = predictionData.append(calculateMeanAverage2(time, trainingData))
+        predictionData = predictionData.append(calculateMeanAverage(time, trainingData))
     predictionData.index.name = 'Period start time'
     return predictionData
 
 def forcastReference(trainingData, futureData):
     predictionData = referenceAlgorithm(trainingData)
-    GraphData.comparisonPlot([formPlotDictionary("prediction", predictionData),
-                              formPlotDictionary("actual", futureData.head(len(predictionData)))],cfg.referenceGraphLocation)
+    GraphData.comparisonPlot([GraphData.formPlotDictionary("prediction", predictionData),
+                              GraphData.formPlotDictionary("actual", futureData.head(len(predictionData)))],cfg.referenceGraphLocation)
 
 
 """
@@ -303,13 +303,13 @@ def predictionARIMA(trainingData, futureData, predictionHours):
     groupedByDayName = DataManipulation.groupDataByDayName(trainingData)
     firstDateTime = pd.to_datetime(trainingData.index.values[-1]) + pd.Timedelta(hours=1)
 
-    if (firstDateTime + pd.Timedelta(hours=predictionHours)).date() == firstDateTime.date():
-        dateTimeRangeDay1 = pd.date_range(start=(firstDateTime), end = firstDateTime + pd.Timedelta(hours=predictionHours), freq='H')
+    if (firstDateTime + pd.Timedelta(hours=predictionHours-1)).date() == firstDateTime.date():
+        dateTimeRangeDay1 = pd.date_range(start=(firstDateTime), end = firstDateTime + pd.Timedelta(hours=predictionHours-1), freq='H')
     else:
         dateTimeRangeDay1 = pd.date_range(start=(firstDateTime),
                               end=pd.Timestamp(year=firstDateTime.year, month=firstDateTime.month, day=firstDateTime.day, hour=23),
                               freq='H')
-    dateTimeRangeDay2 = pd.date_range(start=pd.Timestamp(year=firstDateTime.year, month=firstDateTime.month, day=firstDateTime.day) + pd.DateOffset(1), periods=predictionHours-len(dateTimeRangeDay1), freq='H')
+    dateTimeRangeDay2 = pd.date_range(start=pd.Timestamp(year=firstDateTime.year, month=firstDateTime.month, day=firstDateTime.day) + pd.DateOffset(1), periods=(predictionHours)-len(dateTimeRangeDay1), freq='H')
 
     forcastLengthDay1 = len(dateTimeRangeDay1)
     forcastLengthDay2 = len(dateTimeRangeDay2)
@@ -360,7 +360,7 @@ def predictionARIMA(trainingData, futureData, predictionHours):
             predictionResult[kpi] = forecastData
             predictionResult.set_index(dateTimeRangeDay1.append(dateTimeRangeDay2), inplace =True)
     #GraphData.comparisonPlot([{'data': predictionResult, 'name': 'prediction'},
-    #                         {'data':futureData, 'name': 'actual'}], '../LinearRegression/')
+    #                         {'data':futureData, 'name': 'actual'}], cfg.lrARIMAGraphLocation)
     return predictionResult
 
 """
@@ -569,7 +569,7 @@ def main():
     #forcastReference(trainingData, futureData)
 
     #run straight arima algorithm
-    #predictionARIMA(trainingData, futureData, cfg.predictionHours)
+    predictionARIMA(trainingData, futureData, cfg.predictionHours)
 
     #run straight lstm neural network algorithm
     #predictionLSTM(trainingData, futureData, cfg.predictionHours)
@@ -579,8 +579,8 @@ def main():
     #linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "ARIMA")
 
     #run linear regression lstm algorithm
-    correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
-    linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "LSTM")
+    #correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
+    #linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "LSTM")
 
 
 if __name__== "__main__":

@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import config as cfg
+import os
 
 class GraphData(object):
         @staticmethod
@@ -34,7 +35,7 @@ class GraphData(object):
                     if 'dependencies' in dic:
                         plt.text(1, 1, "Dependent On: " + '\n'.join([str(i) for i in dic['dependencies']]), horizontalalignment='right',verticalalignment='top', transform=plt.gca().transAxes)
                 plt.legend(loc='upper left')
-                GraphData.saveFigure(fig,10,6, storeLocation + columnLabel)
+                GraphData.saveFigure(fig,10,6, os.path.join(storeLocation,columnLabel))
 
         @staticmethod
         def formPlotDictionary(name, data):

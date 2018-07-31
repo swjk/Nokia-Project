@@ -30,7 +30,7 @@ def calculateMeanAverage(time, trainingData):
     ----------
     time: datetime
         time point we want to forecast
-        
+
     trainingData : pandas dataframe
         training data containing one or more KPIs
 
@@ -420,8 +420,8 @@ def fitLSTM(trainInput, trainOutput, nneurons, nbatch, nepoch):
     model.compile(loss="mean_squared_error", optimizer='adam')
 
     for i in range (nepoch):
-        model.fit(X,trainOutput,epochs=1, batch_size=nbatch, verbose=0, shuffle=False)
         model.reset_states()
+        model.fit(X,trainOutput,epochs=1, batch_size=nbatch, verbose=0, shuffle=False)
     return model
 
 def predictionLSTM(trainingData,futureData, predictionHours):

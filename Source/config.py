@@ -34,7 +34,7 @@ referenceWindowSize = 4
 referenceGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "ReferenceResults")
 
 #Linear Regression Algorithm
-topNCorrelations = 5
+topNCorrelations = 3
 lrARIMAGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "LinearRegressionARIMAResults")
 lrLSTMGraphLocation = os.path.join(os.getcwd(), "..", "AlgorithmResults", "LinearRegressionLSTMResults")
 

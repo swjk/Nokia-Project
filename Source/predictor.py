@@ -46,6 +46,10 @@ def calculateMeanAverage(time, trainingData):
     prevDayTime  = time - pd.Timedelta(days=1)
     prevWeekTime = time - pd.Timedelta(days=7)
 
+    #if (prevDayTime.dayofweek == 4 or prevDayTime.dayofweek == 6):
+    #    prevDayTime = time -pd.Timedelta(days=6)
+
+
     prevDaySeries  = trainingData.loc[prevDayTime]
     prevWeekSeries = trainingData.loc[prevWeekTime]
 
@@ -70,6 +74,7 @@ def referenceAlgorithm(trainingData):
         predicted data
     """
     predictionData = pd.DataFrame()
+    print(trainingData)
     timeRange = pd.date_range(start=(trainingData.index.values[-1] + pd.Timedelta(hours=1)), periods=cfg.predictionHours, freq='H')
     for time in timeRange:
         predictionData = predictionData.append(calculateMeanAverage(time, trainingData))
@@ -509,14 +514,15 @@ def calculateNMSE(futureData, predictionData, indexName):
     futureData.index = futureData.index.tz_localize(None)
     predictionData.index = predictionData.index.tz_localize(None)
     for columnLabel, _ in predictionData.iteritems():
-        print (futureData[columnLabel])
-        print (predictionData[columnLabel])
+
         comparisonFrame = pd.concat([futureData[columnLabel], predictionData[columnLabel]], ignore_index=True, axis=1)
         comparisonFrame.dropna(axis=0, how='any', inplace=True)
         pmean = pd.Series(comparisonFrame.iloc[:,0]).mean()
         mmean = pd.Series(comparisonFrame.iloc[:,1]).mean()
-        score = ((pd.Series(comparisonFrame.iloc[:,0]).subtract(pd.Series(comparisonFrame.iloc[:,1])) ** 2) / ((pmean)*(mmean))).mean()
+        score = (((pd.Series(comparisonFrame.iloc[:,0]).subtract(pd.Series(comparisonFrame.iloc[:,1]))) ** 2) / ((pmean)*(mmean))).mean()
+        print (score)
         nmseFrame[columnLabel] = pd.Series(score, index =[indexName])
+    print (nmseFrame)
     nmseFrame.replace([np.inf, -np.inf], np.nan, inplace=True)
     nmseFrame.dropna(axis=1, how='any', inplace=True)
     print(nmseFrame)
@@ -599,25 +605,25 @@ def main():
         #run reference algorithm
         print("------------Producing Reference Graphs")
         referencePredictionResult = forcastReference(trainingData, futureData)
-        #referenceNMSE = calculateNMSE(futureData, referencePredictionResult, "Reference")
+        referenceNMSE = calculateNMSE(futureData, referencePredictionResult, "Reference")
         store.write(spreadSheet1Out, futureData, referencePredictionResult)
 
         #run straight lstm neural network algorithm
         print("------------Producing Straight LSTM Graphs")
         straightLSTMPredictionResult = predictionLSTM(trainingData, futureData, cfg.predictionHours)
-        #straightLSTMNMSE = calculateNMSE(futureData, straightLSTMPredictionResult, "StraightLSTM")
+        straightLSTMNMSE = calculateNMSE(futureData, straightLSTMPredictionResult, "StraightLSTM")
         store.write(spreadSheet2Out, futureData, referencePredictionResult)
 
         #run straight arima algorithm
         print("------------Producing Straight ARIMA Graphs")
         straightARIMAPredictionResult = predictionARIMA(trainingData, futureData, cfg.predictionHours)
-        #straightARIMANMSE = calculateNMSE(futureData, straightARIMAPredictionResult, "StraightARIMA")
+        straightARIMANMSE = calculateNMSE(futureData, straightARIMAPredictionResult, "StraightARIMA")
         store.write(spreadSheet3Out, futureData, referencePredictionResult)
 
         finalResult = pd.concat([referenceNMSE, straightLSTMNMSE, straightARIMANMSE])
-        GraphData.comparisonSeriesPlot([{'data': finalResult.iloc[0,:],'name': 'reference', 'title': 'Method Comparison', 'rotate':90},
+        GraphData.comparisonSeriesPlotLog([{'data': finalResult.iloc[0,:],'name': 'reference', 'title': 'Comparison', 'rotate':90},
                                          {'data': finalResult.iloc[1,:],'name': 'straightLSTM'},
-                                         {'data': finalResult.iloc[2,:],'name': 'straightARIMA'},],
+                                         {'data': finalResult.iloc[2,:],'name': 'straightARIMA'}],
                                           cfg.finalResultGraphLocation)
 
 
@@ -625,15 +631,23 @@ def main():
         print("------------Producing Linear Regression LSTM Graphs")
         correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
         lrLSTMPredictionResult = linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "LSTM")
-        #lrLSTMNMSE = calculateNMSE(futureData, lrLSTMPredictionResult, "lrLSTM")
+        lrLSTMNMSE = calculateNMSE(futureData, lrLSTMPredictionResult, "lrLSTM")
         store.write(spreadSheet4Out, futureData, referencePredictionResult)
 
         #run linear regression arima algorthim
         print("------------Producing Linear Regression ARIMA Graphs")
         correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
         lrARIMAPredictionResult = linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "ARIMA")
-        #lrARIMANMSE = calculateNMSE(futureData, lrARIMAPredictionResult, "lrARIMA")
+        lrARIMANMSE = calculateNMSE(futureData, lrARIMAPredictionResult, "lrARIMA")
         store.write(spreadSheet5Out, futureData, referencePredictionResult)
+
+        finalResult = pd.concat([referenceNMSE,straightLSTMNMSE,straightARIMANMSE,lrLSTMNMSE,lrARIMANMSE])
+        GraphData.comparisonSeriesPlotLog([{'data': finalResult.iloc[0,:],'name': 'reference', 'title': 'Comparison Graph', 'rotate':90},
+                                         {'data': finalResult.iloc[1,:],'name': 'straightLSTM'},
+                                         {'data': finalResult.iloc[2,:],'name': 'straightARIMA'},
+                                         {'data': finalResult.iloc[3,:],'name': 'lrLSTM'},{'data': finalResult.iloc[4,:],'name': 'lrARIMA'}],
+                                         cfg.finalResultGraphLocation)
+
 
 
     else:

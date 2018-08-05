@@ -85,5 +85,40 @@ class GraphData(object):
             GraphData.saveFigure(fig,40,20, os.path.join(storeLocation,name))
 
         @staticmethod
+        def comparisonSeriesPlotLog(dataDicList, storeLocation):
+            """
+            Draw one graph comparing the data in the list of Series
+
+            Parameters
+            ----------
+            dataDicList : list of pandas series
+                contains data to be graphed
+            storeLocation: string
+                location where graphs should be stored
+            Returns
+            -------
+            """
+            if 'title' in dataDicList[0]:
+                name = dataDicList[0]['title']
+            else:
+                name = dataDicList[0]['data'].name
+
+            fig = GraphData.createFigure(name)
+            for dic in dataDicList:
+                if 'style' in dic:
+                        plt.plot(dic['data'], dic['style'], label=dic['name'])
+                else:
+                        plt.plot(dic['data'], label = dic['name'])
+                if 'dependencies' in dic:
+                        plt.text(1, 1, "Dependent On: " + '\n'.join([str(i) for i in dic['dependencies']]), horizontalalignment='right',verticalalignment='top', transform=plt.gca().transAxes)
+
+                if 'rotate' in dic:
+                    plt.xticks(rotation=dic['rotate'])
+            plt.legend(loc='upper left')
+            plt.yscale('log')
+            GraphData.saveFigure(fig,40,20, os.path.join(storeLocation,name))
+
+
+        @staticmethod
         def formPlotDictionary(name, data):
             return {'name': name, 'data': data}

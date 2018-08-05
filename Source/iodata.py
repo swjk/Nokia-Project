@@ -13,11 +13,10 @@ class ExportData(object):
         self.fileName = fileName
         self.sheet    = sheet
 
-    def writeExcelData(self, data):
-        writer = pd.ExcelWriter(self.fileName)
-        data.to_excel(writer,self.sheet)
+    def writeExcelData(self, data, startrow=0):
+        writer = pd.ExcelWriter(self.fileName, engine='openpyxl')
+        data.to_excel(writer,self.sheet, startrow=startrow)
         writer.save()
-
 
 class ImportData(object):
         fileName    = ""
@@ -42,6 +41,16 @@ class ImportData(object):
                 self.dataFrame['Period start time'] = pd.to_datetime(self.dataFrame['Period start time'], format="%d/%m/%Y %H:%M:%S", utc=True, errors='coerce')
 
         def setDataUp(self):
+            """
+            Set up the dataframe such that it is clean to be used for further processing
+            This involves setting index of dataframe to 'Period start time' column, removing PLMN column,
+            dropping all columns and rows that are empty, and converting all entries into numerical form
+
+            Parameters
+            ----------
+            Returns
+            -------
+            """
             #Set datetime to be index
             self.dataFrame.set_index('Period start time', inplace=True)
             #Drop PLMN tag
@@ -56,6 +65,18 @@ class ImportData(object):
             self.dataFrame = self.dataFrame.apply(pd.to_numeric, errors='ignore')
 
         def dataSeparation(self, trainingDays):
+            """
+            Used to separate the data into training data and future data, based on the size of training days given
+
+            Parameters
+            ----------
+            trainingDays int
+                The number of training data days.
+            Returns
+            -------
+            2-tuple
+                returns (trainingData, forecastData)
+            """
             dailyGroupedData = DataManipulation.groupDataByDay(self.dataFrame)
             firstDay         = next(iter(dailyGroupedData.groups))
             trainingData     = pd.DataFrame()

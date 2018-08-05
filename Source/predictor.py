@@ -1,8 +1,9 @@
+import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import config as cfg
-from statsmodels.tsa.statespace.sarimax import SARIMAX
+#from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.stattools import acf,pacf
 from statsmodels.tsa.arima_model import ARIMA
 from statsmodels.tsa.arima_model import ARMAResults
@@ -17,6 +18,9 @@ from iodata import ExportData, ImportData
 from graphdata import GraphData
 from manipulatedata import DataManipulation
 from correlation import Correlation
+
+
+import store as store
 
 """
 -------------------------------------------------------------------------------
@@ -73,10 +77,10 @@ def referenceAlgorithm(trainingData):
     return predictionData
 
 def forcastReference(trainingData, futureData):
-    predictionData = referenceAlgorithm(trainingData)
-    GraphData.comparisonPlot([GraphData.formPlotDictionary("prediction", predictionData),
-                              GraphData.formPlotDictionary("actual", futureData.head(len(predictionData)))],cfg.referenceGraphLocation)
-
+    predictionResult = referenceAlgorithm(trainingData)
+    #GraphData.comparisonDataFramePlot([GraphData.formPlotDictionary("prediction", predictionResult),
+    #                          GraphData.formPlotDictionary("actual", futureData.head(len(predictionResult)))],cfg.referenceGraphLocation)
+    return predictionResult
 
 """
 -------------------------------------------------------------------------------
@@ -105,7 +109,7 @@ def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, p
     -------
 
     """
-
+    predictionResult = pd.DataFrame()
     for kpi in trainingData:
         print (kpi)
         if kpi not in correlationHourlyData.columns:
@@ -138,7 +142,6 @@ def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, p
                                                     cfg.predictionHours)
 
             forcastTargetKPIValues = regr.predict(forcastTopCorrelationKPIsValues.values)
-            predictionResult = pd.DataFrame()
             predictionResult[kpi] = forcastTargetKPIValues
             predictionResult.set_index(forcastTopCorrelationKPIsValues.index, inplace=True)
 
@@ -149,10 +152,11 @@ def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, p
             predictionStdUpperLimit[kpi] = predictionResult[kpi].add(predictionShiftLimit)
             predictionStdLowerLimit[kpi] = predictionResult[kpi].subtract(predictionShiftLimit)
 
-            GraphData.comparisonPlot([{'data': predictionResult, 'dependencies': topCorrelationKPIsNames, 'name': 'prediction'},
-                              {'data': predictionStdUpperLimit, 'style': '--', 'name': "upperlimit"},
-                              {'data': predictionStdLowerLimit, 'style': '--', 'name': "lowerlimit"},
-                              {'data':futureData, 'name': 'actual'}], graphStoreLocation)
+            #GraphData.comparisonSeriesPlot([{'data': predictionResult[kpi], 'dependencies': topCorrelationKPIsNames, 'name': 'prediction'},
+            #                                {'data': predictionStdUpperLimit, 'style': '--', 'name': "upperlimit"},
+            #                                {'data': predictionStdLowerLimit, 'style': '--', 'name': "lowerlimit"},
+            #                                {'data':futureData[kpi], 'name': 'actual'}], graphStoreLocation)
+    return predictionResult
 
 #------Forcast Limits--------------
 def forcastLimits(trainingData, predictionHours, kpi):
@@ -267,13 +271,9 @@ def arimaModel(order,trainingData):
         model       = ARIMA(trainingData, order=order)
         model1Result= model.fit(disp=0)
         residuals = pd.DataFrame(model1Result.resid)
-        print(residuals)
         if residuals.isnull().values.any():
-            print(10**10)
             return 10**10
         else:
-            print("Std")
-            print(residuals.std())
             return residuals.std()
     except KeyboardInterrupt:
         return
@@ -334,7 +334,7 @@ def predictionARIMA(trainingData, futureData, predictionHours):
 
         except:
             continue
-
+        print("Model1 -Optimised")
         predictionDataDay1 = model1.forecast(forcastLengthDay1)
         predictionDataDay2 = None
         if forcastLengthDay2 > 0:
@@ -345,7 +345,7 @@ def predictionARIMA(trainingData, futureData, predictionHours):
 
             except:
                 continue
-
+            print("Model2 -Optimised")
             predictionDataDay2 = model2.forecast(forcastLengthDay2)
 
         if predictionDataDay2 == None:
@@ -359,8 +359,8 @@ def predictionARIMA(trainingData, futureData, predictionHours):
             print (forecastData)
             predictionResult[kpi] = forecastData
             predictionResult.set_index(dateTimeRangeDay1.append(dateTimeRangeDay2), inplace =True)
-        #GraphData.comparisonPlot([{'data': predictionResult, 'name': 'prediction'},
-        #                             {'data':futureData, 'name': 'actual'}], cfg.)
+        #GraphData.comparisonSeriesPlot([{'data': predictionResult[kpi],  'name': 'prediction'},
+        #                              {'data':futureData[kpi], 'name': 'actual'}], cfg.arimaGraphLocation)
     return predictionResult
 
 """
@@ -487,10 +487,10 @@ def predictionLSTM(trainingData,futureData, predictionHours):
         forecastInvScale = scaler.inverse_transform(forecastInvScale.reshape(1,-1))
         forecastInvScale = forecastInvScale[0,:]
 
-        predictionResult[kpi] = pd.Series(forecastInvScale)
+        predictionResult[kpi] = pd.Series(forecastInvScale, index= dateTimeRange)
 
-        #GraphData.comparisonPlot([{'data': predictionResult,  'name': 'prediction'},
-        #                          {'data':futureData, 'name': 'actual'}], cfg.lstmGraphLocation)
+        #GraphData.comparisonSeriesPlot([{'data': predictionResult[kpi],  'name': 'prediction'},
+        #                              {'data':futureData[kpi], 'name': 'actual'}], cfg.lstmGraphLocation)
     predictionResult.set_index(dateTimeRange, inplace=True)
     return predictionResult
 
@@ -503,6 +503,26 @@ def calculateMAE(originalData, predictionData):
         mae = pd.Series(comparisonFrame.iloc[:,0]).subtract(pd.Series(comparisonFrame.iloc[:,1])).abs().mean()
         maeFrame[columnLabel] = pd.Series(mae, index=["MAE"])
     return maeFrame
+
+def calculateNMSE(futureData, predictionData, indexName):
+    nmseFrame = pd.DataFrame()
+    futureData.index = futureData.index.tz_localize(None)
+    predictionData.index = predictionData.index.tz_localize(None)
+    for columnLabel, _ in predictionData.iteritems():
+        print (futureData[columnLabel])
+        print (predictionData[columnLabel])
+        comparisonFrame = pd.concat([futureData[columnLabel], predictionData[columnLabel]], ignore_index=True, axis=1)
+        comparisonFrame.dropna(axis=0, how='any', inplace=True)
+        pmean = pd.Series(comparisonFrame.iloc[:,0]).mean()
+        mmean = pd.Series(comparisonFrame.iloc[:,1]).mean()
+        score = ((pd.Series(comparisonFrame.iloc[:,0]).subtract(pd.Series(comparisonFrame.iloc[:,1])) ** 2) / ((pmean)*(mmean))).mean()
+        nmseFrame[columnLabel] = pd.Series(score, index =[indexName])
+    nmseFrame.replace([np.inf, -np.inf], np.nan, inplace=True)
+    nmseFrame.dropna(axis=1, how='any', inplace=True)
+    print(nmseFrame)
+    print (nmseFrame.columns)
+    print ("{} {}".format("Length of columns:", len(nmseFrame.columns)))
+    return nmseFrame
 
 
 def importDataFromExcel(type):
@@ -554,8 +574,11 @@ def main():
     spreadSheet2In  = importDataFromExcel('daily')
 
     #export stats to rate models (e.g mae)
-    #spreadSheet1Out = exportDataToExcel('stats')
-
+    spreadSheet1Out = ExportData(cfg.writeStatsDataLocation_Ref, cfg.writeStatsDataSheetName)
+    spreadSheet2Out = ExportData(cfg.writeStatsDataLocation_S_LSTM, cfg.writeStatsDataSheetName)
+    spreadSheet3Out = ExportData(cfg.writeStatsDataLocation_S_ARIMA, cfg.writeStatsDataSheetName)
+    spreadSheet4Out = ExportData(cfg.writeStatsDataLocation_LR_LSTM, cfg.writeStatsDataSheetName)
+    spreadSheet5Out = ExportData(cfg.writeStatsDataLocation_LR_ARIMA, cfg.writeStatsDataSheetName)
     #export hourly correlation
     #spreadSheet3Out = exportDataToExcel('corrHourly')
 
@@ -565,22 +588,57 @@ def main():
     #split imported data into training and future data. future data is what is predicted
     trainingData, futureData = spreadSheet1In.dataSeparation(cfg.trainingDays)
 
-    #run reference algorithm
-    #forcastReference(trainingData, futureData)
+    if sys.argv[1] == 'ref':
+        #run reference algorithm
+        print("------------Producing Reference Graphs")
+        referencePredictionResult = forcastReference(trainingData, futureData)
+        #referenceNMSE = calculateNMSE(futureData, referencePredictionResult, "Reference")
+        store.write(spreadSheet1Out, futureData, referencePredictionResult)
 
-    #run straight arima algorithm
-    #predictionARIMA(trainingData, futureData, cfg.predictionHours)
+    elif sys.argv[1] == 'all':
+        #run reference algorithm
+        print("------------Producing Reference Graphs")
+        referencePredictionResult = forcastReference(trainingData, futureData)
+        #referenceNMSE = calculateNMSE(futureData, referencePredictionResult, "Reference")
+        store.write(spreadSheet1Out, futureData, referencePredictionResult)
 
-    #run straight lstm neural network algorithm
-    #predictionLSTM(trainingData, futureData, cfg.predictionHours)
+        #run straight lstm neural network algorithm
+        print("------------Producing Straight LSTM Graphs")
+        straightLSTMPredictionResult = predictionLSTM(trainingData, futureData, cfg.predictionHours)
+        #straightLSTMNMSE = calculateNMSE(futureData, straightLSTMPredictionResult, "StraightLSTM")
+        store.write(spreadSheet2Out, futureData, referencePredictionResult)
 
-    #run linear regression arima algorthim
-    #correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
-    #linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "ARIMA")
+        #run straight arima algorithm
+        print("------------Producing Straight ARIMA Graphs")
+        straightARIMAPredictionResult = predictionARIMA(trainingData, futureData, cfg.predictionHours)
+        #straightARIMANMSE = calculateNMSE(futureData, straightARIMAPredictionResult, "StraightARIMA")
+        store.write(spreadSheet3Out, futureData, referencePredictionResult)
 
-    #run linear regression lstm algorithm
-    correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
-    linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "LSTM")
+        finalResult = pd.concat([referenceNMSE, straightLSTMNMSE, straightARIMANMSE])
+        GraphData.comparisonSeriesPlot([{'data': finalResult.iloc[0,:],'name': 'reference', 'title': 'Method Comparison', 'rotate':90},
+                                         {'data': finalResult.iloc[1,:],'name': 'straightLSTM'},
+                                         {'data': finalResult.iloc[2,:],'name': 'straightARIMA'},],
+                                          cfg.finalResultGraphLocation)
+
+
+        #run linear regression lstm algorithm
+        print("------------Producing Linear Regression LSTM Graphs")
+        correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
+        lrLSTMPredictionResult = linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "LSTM")
+        #lrLSTMNMSE = calculateNMSE(futureData, lrLSTMPredictionResult, "lrLSTM")
+        store.write(spreadSheet4Out, futureData, referencePredictionResult)
+
+        #run linear regression arima algorthim
+        print("------------Producing Linear Regression ARIMA Graphs")
+        correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
+        lrARIMAPredictionResult = linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, "ARIMA")
+        #lrARIMANMSE = calculateNMSE(futureData, lrARIMAPredictionResult, "lrARIMA")
+        store.write(spreadSheet5Out, futureData, referencePredictionResult)
+
+
+    else:
+        print ("Error - Argument must be provided")
+        sys.exit()
 
 
 if __name__== "__main__":

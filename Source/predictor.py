@@ -521,7 +521,7 @@ def calculateNMSE(futureData, predictionData, indexName):
         mmean = pd.Series(comparisonFrame.iloc[:,1]).mean()
         score = (((pd.Series(comparisonFrame.iloc[:,0]).subtract(pd.Series(comparisonFrame.iloc[:,1]))) ** 2) / ((pmean)*(mmean))).mean()
         print (score)
-        nmseFrame[columnLabel] = pd.Series(score, index =[indexName])
+        nmseFrame[columnLabel] = pd.Series(abs(score), index =[indexName])
     print (nmseFrame)
     nmseFrame.replace([np.inf, -np.inf], np.nan, inplace=True)
     nmseFrame.dropna(axis=1, how='any', inplace=True)
@@ -585,6 +585,8 @@ def main():
     spreadSheet3Out = ExportData(cfg.writeStatsDataLocation_S_ARIMA, cfg.writeStatsDataSheetName)
     spreadSheet4Out = ExportData(cfg.writeStatsDataLocation_LR_LSTM, cfg.writeStatsDataSheetName)
     spreadSheet5Out = ExportData(cfg.writeStatsDataLocation_LR_ARIMA, cfg.writeStatsDataSheetName)
+    spreadSheet6Out = ExportData(cfg.writeStatsNMSELocation, cfg.writeStatsNMSESheetName)
+    spreadSheet7Out = ExportData(cfg.writeStatsNMSELocationAll, cfg.writeStatsNMSESheetName)
     #export hourly correlation
     #spreadSheet3Out = exportDataToExcel('corrHourly')
 
@@ -598,9 +600,10 @@ def main():
         #run reference algorithm
         print("------------Producing Reference Graphs")
         referencePredictionResult = forcastReference(trainingData, futureData)
-        #referenceNMSE = calculateNMSE(futureData, referencePredictionResult, "Reference")
+        referenceNMSE = calculateNMSE(futureData, referencePredictionResult, "Reference")
         store.write(spreadSheet1Out, futureData, referencePredictionResult)
-
+        finalResult = referenceNMSE
+        spreadSheet6Out.writeExcelData(finalResult)
     elif sys.argv[1] == 'all':
         #run reference algorithm
         print("------------Producing Reference Graphs")
@@ -621,6 +624,7 @@ def main():
         store.write(spreadSheet3Out, futureData, referencePredictionResult)
 
         finalResult = pd.concat([referenceNMSE, straightLSTMNMSE, straightARIMANMSE])
+        spreadSheet6Out.writeExcelData(finalResult)
         GraphData.comparisonSeriesPlotLog([{'data': finalResult.iloc[0,:],'name': 'reference', 'title': 'Comparison', 'rotate':90},
                                          {'data': finalResult.iloc[1,:],'name': 'straightLSTM'},
                                          {'data': finalResult.iloc[2,:],'name': 'straightARIMA'}],
@@ -642,6 +646,7 @@ def main():
         store.write(spreadSheet5Out, futureData, referencePredictionResult)
 
         finalResult = pd.concat([referenceNMSE,straightLSTMNMSE,straightARIMANMSE,lrLSTMNMSE,lrARIMANMSE])
+        spreadSheet7Out.writeExcelData(finalResult)
         GraphData.comparisonSeriesPlotLog([{'data': finalResult.iloc[0,:],'name': 'reference', 'title': 'Comparison Graph', 'rotate':90},
                                          {'data': finalResult.iloc[1,:],'name': 'straightLSTM'},
                                          {'data': finalResult.iloc[2,:],'name': 'straightARIMA'},

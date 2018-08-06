@@ -18,6 +18,10 @@ writeStatsDataLocation_LR_LSTM    = os.path.join(os.getcwd(), "..", "Data", "Res
 writeStatsDataLocation_LR_ARIMA   = os.path.join(os.getcwd(), "..", "Data", "Results-LR_ARIMA.xlsx")
 writeStatsDataSheetName    = "Output"
 
+#Write NMSE Scores
+writeStatsNMSELocation     = os.path.join(os.getcwd(), "..", "Data", "NMSE.xlsx")
+writeStatsNMSELocationAll  = os.path.join(os.getcwd(), "..", "Data", "NMSEAll.xlsx")
+writeStatsNMSESheetName    = "Output"
 #Write Correlation Data
 writeCorrelationDailyLocation  = os.path.join(os.getcwd(), "..", "Data", "CorrelationDaily.xlsx")
 writeCorrelationSDailySheetName = "Sheet1"

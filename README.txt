@@ -14,7 +14,7 @@ All other dependent files are also found in Source/*.py
 
 
 
-1* contains the main function which can be run : python3 predictor.py
+1* contains the main function which can be run : python3 predictor.py all or python3 predictor.py ref
 
 1* contains currently:
 	Reference Algorithm

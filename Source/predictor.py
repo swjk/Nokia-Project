@@ -83,8 +83,8 @@ def referenceAlgorithm(trainingData):
 
 def forcastReference(trainingData, futureData):
     predictionResult = referenceAlgorithm(trainingData)
-    #GraphData.comparisonDataFramePlot([GraphData.formPlotDictionary("prediction", predictionResult),
-    #                          GraphData.formPlotDictionary("actual", futureData.head(len(predictionResult)))],cfg.referenceGraphLocation)
+    GraphData.comparisonDataFramePlot([GraphData.formPlotDictionary("prediction", predictionResult),
+                              GraphData.formPlotDictionary("actual", futureData.head(len(predictionResult)))],cfg.referenceGraphLocation)
     return predictionResult
 
 """
@@ -157,10 +157,10 @@ def linearRegressionAlgorithm(trainingData, futureData, correlationHourlyData, p
             predictionStdUpperLimit[kpi] = predictionResult[kpi].add(predictionShiftLimit)
             predictionStdLowerLimit[kpi] = predictionResult[kpi].subtract(predictionShiftLimit)
 
-            #GraphData.comparisonSeriesPlot([{'data': predictionResult[kpi], 'dependencies': topCorrelationKPIsNames, 'name': 'prediction'},
-            #                                {'data': predictionStdUpperLimit, 'style': '--', 'name': "upperlimit"},
-            #                                {'data': predictionStdLowerLimit, 'style': '--', 'name': "lowerlimit"},
-            #                                {'data':futureData[kpi], 'name': 'actual'}], graphStoreLocation)
+            GraphData.comparisonSeriesPlot([{'data': predictionResult[kpi], 'dependencies': topCorrelationKPIsNames, 'name': 'prediction'},
+                                            {'data': predictionStdUpperLimit, 'style': '--', 'name': "upperlimit"},
+                                            {'data': predictionStdLowerLimit, 'style': '--', 'name': "lowerlimit"},
+                                            {'data':futureData[kpi], 'name': 'actual'}], graphStoreLocation)
     return predictionResult
 
 #------Forcast Limits--------------
@@ -364,8 +364,8 @@ def predictionARIMA(trainingData, futureData, predictionHours):
             print (forecastData)
             predictionResult[kpi] = forecastData
             predictionResult.set_index(dateTimeRangeDay1.append(dateTimeRangeDay2), inplace =True)
-        #GraphData.comparisonSeriesPlot([{'data': predictionResult[kpi],  'name': 'prediction'},
-        #                              {'data':futureData[kpi], 'name': 'actual'}], cfg.arimaGraphLocation)
+        GraphData.comparisonSeriesPlot([{'data': predictionResult[kpi],  'name': 'prediction'},
+                                      {'data':futureData[kpi], 'name': 'actual'}], cfg.arimaGraphLocation)
     return predictionResult
 
 """
@@ -494,8 +494,8 @@ def predictionLSTM(trainingData,futureData, predictionHours):
 
         predictionResult[kpi] = pd.Series(forecastInvScale, index= dateTimeRange)
 
-        #GraphData.comparisonSeriesPlot([{'data': predictionResult[kpi],  'name': 'prediction'},
-        #                              {'data':futureData[kpi], 'name': 'actual'}], cfg.lstmGraphLocation)
+        GraphData.comparisonSeriesPlot([{'data': predictionResult[kpi],  'name': 'prediction'},
+                                      {'data':futureData[kpi], 'name': 'actual'}], cfg.lstmGraphLocation)
     predictionResult.set_index(dateTimeRange, inplace=True)
     return predictionResult
 
@@ -514,7 +514,6 @@ def calculateNMSE(futureData, predictionData, indexName):
     futureData.index = futureData.index.tz_localize(None)
     predictionData.index = predictionData.index.tz_localize(None)
     for columnLabel, _ in predictionData.iteritems():
-
         comparisonFrame = pd.concat([futureData[columnLabel], predictionData[columnLabel]], ignore_index=True, axis=1)
         comparisonFrame.dropna(axis=0, how='any', inplace=True)
         pmean = pd.Series(comparisonFrame.iloc[:,0]).mean()
@@ -630,7 +629,6 @@ def main():
                                          {'data': finalResult.iloc[2,:],'name': 'straightARIMA'}],
                                           cfg.finalResultGraphLocation)
 
-
         #run linear regression lstm algorithm
         print("------------Producing Linear Regression LSTM Graphs")
         correlationHourlyData = Correlation.correlation(spreadSheet1In.dataFrame, cfg.hourlyCorrThreshold)
@@ -652,8 +650,6 @@ def main():
                                          {'data': finalResult.iloc[2,:],'name': 'straightARIMA'},
                                          {'data': finalResult.iloc[3,:],'name': 'lrLSTM'},{'data': finalResult.iloc[4,:],'name': 'lrARIMA'}],
                                          cfg.finalResultGraphLocation)
-
-
 
     else:
         print ("Error - Argument must be provided")

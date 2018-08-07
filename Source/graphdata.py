@@ -82,7 +82,7 @@ class GraphData(object):
                     plt.xticks(rotation=dic['rotate'])
             plt.legend(loc='upper left')
             #fig.tight_layout()
-            GraphData.saveFigure(fig,40,20, os.path.join(storeLocation,name))
+            GraphData.saveFigure(fig,10,6, os.path.join(storeLocation,name))
 
         @staticmethod
         def comparisonSeriesPlotLog(dataDicList, storeLocation):

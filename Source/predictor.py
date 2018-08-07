@@ -46,8 +46,8 @@ def calculateMeanAverage(time, trainingData):
     prevDayTime  = time - pd.Timedelta(days=1)
     prevWeekTime = time - pd.Timedelta(days=7)
 
-    #if (prevDayTime.dayofweek == 4 or prevDayTime.dayofweek == 6):
-    #    prevDayTime = time -pd.Timedelta(days=6)
+    if (prevDayTime.dayofweek == 4 or prevDayTime.dayofweek == 6):
+        prevDayTime = time -pd.Timedelta(days=6)
 
 
     prevDaySeries  = trainingData.loc[prevDayTime]
@@ -83,8 +83,8 @@ def referenceAlgorithm(trainingData):
 
 def forcastReference(trainingData, futureData):
     predictionResult = referenceAlgorithm(trainingData)
-    GraphData.comparisonDataFramePlot([GraphData.formPlotDictionary("prediction", predictionResult),
-                              GraphData.formPlotDictionary("actual", futureData.head(len(predictionResult)))],cfg.referenceGraphLocation)
+    #GraphData.comparisonDataFramePlot([GraphData.formPlotDictionary("prediction", predictionResult),
+    #                          GraphData.formPlotDictionary("actual", futureData.head(len(predictionResult)))],cfg.referenceGraphLocation)
     return predictionResult
 
 """

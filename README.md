@@ -6,6 +6,6 @@ Experimentation involved using LSTM neural nets and ARIMA models + understanding
 Example Graph Models:
 
 
-![Alt text](p3.png?raw=true )
+![Alt text](p3.png?raw=true | width=200 )
 
 ![Alt text](p4.png?raw=true )
